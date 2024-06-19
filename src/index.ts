@@ -1,10 +1,11 @@
+import { reportErrorWebhook } from './helpers/discord';
 import {
 	filterSubwayAndBusAlerts,
 	fetchTTCAlerts,
 	createThreadsMediaContainer,
 	publishThreadsMediaContainer,
 	checkThreadsMediaContainerStatus,
-} from './helpers';
+} from './helpers/threads';
 
 export default {
 	async scheduled(event, env, ctx): Promise<void> {
@@ -36,7 +37,8 @@ export default {
 			});
 
 			if (mediaContainerError) {
-				console.log('There was an error creating the media container', mediaContainerError.error.message);
+				console.log('There was an error creating the media container:', mediaContainerError.message);
+				// reportErrorWebhook({ webhookId: env.DISCORD_WEBHOOK_ID, webhookToken: env.DISCORD_WEBHOOK_TOKEN });
 				return;
 			}
 
@@ -46,8 +48,6 @@ export default {
 				console.log('There was an error checking the status of the media container');
 				return;
 			}
-
-			console.log(status, id);
 
 			const { error: mediaPublishError } = await publishThreadsMediaContainer({
 				userId: env.THREADS_USER_ID,

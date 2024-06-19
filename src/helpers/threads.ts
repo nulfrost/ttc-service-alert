@@ -39,10 +39,6 @@ export type TTCApiResponse = {
 };
 
 type ThreadsMediaStatusResponse = { status: 'FINISHED'; id: string } | { status: 'ERROR'; id: string; error_message: string };
-type ThreadsMediaContainerResponse = {
-	id: string;
-	error?: ThreadsErrorResponse;
-};
 type ThreadsErrorResponse = {
 	error: {
 		message: string;
@@ -70,14 +66,11 @@ export async function createThreadsMediaContainer({
 	accessToken: string;
 	postContent: string;
 }) {
-	const response = await fetch(
-		`https://graph.threads.net/v1.0/${userId}/threads?media_type=text&text=${postContent}&access_token=${accessToken}`,
-		{
-			method: 'POST',
-		}
-	);
+	const response = await fetch(`https://graph.threads.net/v1.0/${userId}/threads?&text=${postContent}&access_token=${accessToken}`, {
+		method: 'POST',
+	});
 
-	const { id, error }: ThreadsMediaContainerResponse = await response.json();
+	const { id, error }: { id: string; error: { message: string; type: string; code: number; fbtrace_id: string } } = await response.json();
 
 	return {
 		id,
