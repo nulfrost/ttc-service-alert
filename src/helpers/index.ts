@@ -14,7 +14,7 @@ const RouteSchema = z.object({
 	route: z.string(),
 	routeBranch: z.string(),
 	routeTypeSrc: z.string(),
-	routeType: z.union([z.literal('Bus'), z.literal('Subway'), z.literal('Elevator')]),
+	routeType: z.union([z.literal('Bus'), z.literal('Subway'), z.literal('Elevator'), z.literal('Streetcar')]),
 	stopStart: z.string(),
 	stopEnd: z.string(),
 	title: z.string(),
@@ -38,26 +38,68 @@ export type TTCApiResponse = {
 	accessibility: Route[];
 };
 
+type ThreadsMediaStatusResponse = { status: 'FINISHED'; id: string } | { status: 'ERROR'; id: string; error_message: string };
+type ThreadsMediaContainerResponse = {
+	id: string;
+	error?: ThreadsErrorResponse;
+};
+type ThreadsErrorResponse = {
+	error: {
+		message: string;
+		type: string;
+		code: number;
+		fbtrace_id: string;
+	};
+};
+
 export function filterSubwayAndBusAlerts(routes: Route[]) {
 	return routes.filter((route) => route.alertType === 'Planned');
 }
 
-export async function fetchRecentTTCAlerts(endpoint: string): Promise<TTCApiResponse> {
-	const response = await fetch(endpoint);
+export async function fetchTTCAlerts(): Promise<TTCApiResponse> {
+	const response = await fetch('https://alerts.ttc.ca/api/alerts/live-alerts');
 	return response.json();
 }
 
 export async function createThreadsMediaContainer({
 	userId,
 	accessToken,
+	postContent,
 }: {
 	userId: string;
 	accessToken: string;
-}): Promise<{ id: string }> {
-	const response = await fetch(`https://graph.threads.net/v1.0/${userId}/threads?text=Test%20Post&access_token=${accessToken}`, {
-		method: 'POST',
-	});
-	return response.json();
+	postContent: string;
+}) {
+	const response = await fetch(
+		`https://graph.threads.net/v1.0/${userId}/threads?media_type=text&text=${postContent}&access_token=${accessToken}`,
+		{
+			method: 'POST',
+		}
+	);
+
+	const { id, error }: ThreadsMediaContainerResponse = await response.json();
+
+	return {
+		id,
+		error,
+	};
+}
+
+export async function checkThreadsMediaContainerStatus({
+	mediaContainerId,
+	accessToken,
+}: {
+	mediaContainerId: string;
+	accessToken: string;
+}) {
+	const response = await fetch(
+		`https://graph.threads.net/v1.0/${mediaContainerId}?fields=status,error_message&access_token=${accessToken}`
+	);
+
+	const { status }: ThreadsMediaStatusResponse = await response.json();
+	return {
+		status,
+	};
 }
 
 export async function publishThreadsMediaContainer({
@@ -69,7 +111,15 @@ export async function publishThreadsMediaContainer({
 	mediaContainerId: string;
 	accessToken: string;
 }) {
-	await fetch(`https://graph.threads.net/v1.0/${userId}/threads_publish?creation_id=${mediaContainerId}&access_token=${accessToken}`, {
-		method: 'POST',
-	});
+	const response = await fetch(
+		`https://graph.threads.net/v1.0/${userId}/threads_publish?creation_id=${mediaContainerId}&access_token=${accessToken}`,
+		{
+			method: 'POST',
+		}
+	);
+
+	const { error }: ThreadsErrorResponse = await response.json();
+	return {
+		error,
+	};
 }
