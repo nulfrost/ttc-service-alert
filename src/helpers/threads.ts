@@ -47,8 +47,12 @@ type ThreadsErrorResponse = {
 	};
 };
 
-export function filterAlertType(routes: Route[]) {
+export function filterAlertsByAlertType(routes: Route[]) {
 	return routes.filter((route) => route.alertType === 'Planned');
+}
+
+export function sortAlertsByTimestamp(routes: Route[]) {
+	return routes.sort((a, b) => new Date(a.lastUpdated).getTime() - new Date(b.lastUpdated).getTime());
 }
 
 export function generateOutageTag(routeType: Route['routeType']) {
