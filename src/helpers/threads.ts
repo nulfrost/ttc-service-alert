@@ -38,7 +38,6 @@ export type TTCApiResponse = {
 	accessibility: Route[];
 };
 
-type ThreadsMediaStatusResponse = { status: 'FINISHED'; id: string } | { status: 'ERROR'; id: string; error_message: string };
 type ThreadsErrorResponse = {
 	error: {
 		message: string;
@@ -48,8 +47,21 @@ type ThreadsErrorResponse = {
 	};
 };
 
-export function filterSubwayAndBusAlerts(routes: Route[]) {
+export function filterAlertType(routes: Route[]) {
 	return routes.filter((route) => route.alertType === 'Planned');
+}
+
+export function generateOutageTag(routeType: Route['routeType']) {
+	switch (routeType) {
+		case 'Bus':
+			return '🚌 [BUS ALERT]\n';
+		case 'Streetcar':
+			return '🚋 [STREETCAR ALERT]\n';
+		case 'Subway':
+			return '🚊 [SUBWAY ALERT]\n';
+		case 'Elevator':
+			return '♿️ [ACCESSIBILITY ALERT]\n';
+	}
 }
 
 export async function fetchTTCAlerts(): Promise<TTCApiResponse> {
@@ -66,32 +78,18 @@ export async function createThreadsMediaContainer({
 	accessToken: string;
 	postContent: string;
 }) {
-	const response = await fetch(`https://graph.threads.net/v1.0/${userId}/threads?&text=${postContent}&access_token=${accessToken}`, {
-		method: 'POST',
-	});
+	const response = await fetch(
+		`https://graph.threads.net/v1.0/${userId}/threads?media_type=text&text=${postContent}&access_token=${accessToken}`,
+		{
+			method: 'POST',
+		}
+	);
 
 	const { id, error }: { id: string; error: { message: string; type: string; code: number; fbtrace_id: string } } = await response.json();
 
 	return {
 		id,
 		error,
-	};
-}
-
-export async function checkThreadsMediaContainerStatus({
-	mediaContainerId,
-	accessToken,
-}: {
-	mediaContainerId: string;
-	accessToken: string;
-}) {
-	const response = await fetch(
-		`https://graph.threads.net/v1.0/${mediaContainerId}?fields=status,error_message&access_token=${accessToken}`
-	);
-
-	const { status }: ThreadsMediaStatusResponse = await response.json();
-	return {
-		status,
 	};
 }
 
