@@ -64,8 +64,8 @@ export default {
 
 			const mostRecentAlert = await env.ttc_alerts.get(listOfAlerts.keys[0].name);
 			const parsedRecentAlert: ReturnType<typeof filterAlertsByAlertType> = JSON.parse(mostRecentAlert as unknown as string);
-			const filteredAlertsIds = new Set(filteredAlerts.map((alert) => alert.id));
-			const newAlerts = parsedRecentAlert.filter((alert) => !filteredAlertsIds.has(alert.id));
+			const parsedRecentAlertIds = new Set(parsedRecentAlert.map((alert) => alert.id));
+			const newAlerts = filteredAlerts.filter((alert) => !parsedRecentAlertIds.has(alert.id));
 			if (newAlerts.length === 0) {
 				// no new alerts
 				return;
