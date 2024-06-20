@@ -21,7 +21,12 @@ export default {
 				return;
 			}
 
-			const listOfAlerts = await env.ttc_alerts.list({ limit: 1 });
+			if (lastUpdatedAlerts === alerts.lastUpdated) {
+				// for some reason the lastUpdated field goes back in time...?
+				return;
+			}
+
+			const listOfAlerts = await env.ttc_alerts.list();
 			if (listOfAlerts.keys.length === 0) {
 				// cache is completely empty, fill it with most recent events
 				for (const alert of alertsSortedByMostRecentTimestamp) {
@@ -62,7 +67,7 @@ export default {
 			// the case where lastUpdated is not in the cache and the cache is not completely empty
 			// meaning we are checking our cached result vs the new fetched results (should be different)
 
-			const mostRecentAlert = await env.ttc_alerts.get(listOfAlerts.keys[0].name);
+			const mostRecentAlert = await env.ttc_alerts.get(listOfAlerts.keys[listOfAlerts.keys.length - 1].name);
 			const parsedRecentAlert: ReturnType<typeof filterAlertsByAlertType> = JSON.parse(mostRecentAlert as unknown as string);
 			const parsedRecentAlertIds = new Set(parsedRecentAlert.map((alert) => alert.id));
 			const newAlerts = filteredAlerts.filter((alert) => !parsedRecentAlertIds.has(alert.id));
