@@ -33,6 +33,8 @@ export default {
 
 							${alert.headerText}\n
 
+							${alert.description !== '' ? `${alert.description}\n` : ''}
+
 						`),
 					});
 
@@ -60,16 +62,14 @@ export default {
 			// the case where lastUpdated is not in the cache and the cache is not completely empty
 			// meaning we are checking our cached result vs the new fetched results (should be different)
 
-			const parsedRecentAlert: ReturnType<typeof filterAlertsByAlertType> = JSON.parse(listOfAlerts as unknown as string);
-			const currentAlertIds = alertsSortedByMostRecentTimestamp.map((alert) => alert.id);
-			const parsedAlertIds = parsedRecentAlert.map((alert) => alert.id);
-			const newAlertIds = currentAlertIds.filter((alert) => !parsedAlertIds.includes(alert));
-			if (newAlertIds.length === 0) {
+			const mostRecentAlert = await env.ttc_alerts.get(listOfAlerts.keys[0].name);
+			const parsedRecentAlert: ReturnType<typeof filterAlertsByAlertType> = JSON.parse(mostRecentAlert as unknown as string);
+			const filteredAlertsIds = new Set(filteredAlerts.map((alert) => alert.id));
+			const newAlerts = parsedRecentAlert.filter((alert) => !filteredAlertsIds.has(alert.id));
+			if (newAlerts.length === 0) {
 				// no new alerts
 				return;
 			}
-
-			const newAlerts = alertsSortedByMostRecentTimestamp.filter((alert, index) => alert.id.includes(newAlertIds[index]));
 
 			for (const alert of newAlerts) {
 				const { id, error: mediaContainerError } = await createThreadsMediaContainer({
@@ -79,6 +79,8 @@ export default {
 							${generateOutageTag(alert.routeType)}
 
 							${alert.headerText}\n
+
+							${alert.description !== '' ? `${alert.description}\n` : ''}
 
 						`),
 				});
@@ -99,6 +101,7 @@ export default {
 					return;
 				}
 			}
+			await env.ttc_alerts.put(alerts.lastUpdated, JSON.stringify(filteredAlerts));
 		} catch (error) {
 			console.error('unhandled error', error);
 			reportErrorWebhook({ webhookId: env.DISCORD_WEBHOOK_ID, webhookToken: env.DISCORD_WEBHOOK_TOKEN });
