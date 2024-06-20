@@ -58,6 +58,7 @@ export default {
 			}
 
 			// the case where lastUpdated is not in the cache and the cache is not completely empty
+			// meaning we are checking our cached result vs the new fetched results (should be different)
 
 			const parsedRecentAlert: ReturnType<typeof filterAlertsByAlertType> = JSON.parse(listOfAlerts as unknown as string);
 			const currentAlertIds = alertsSortedByMostRecentTimestamp.map((alert) => alert.id);
