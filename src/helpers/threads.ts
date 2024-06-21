@@ -55,12 +55,6 @@ export function sortAlertsByTimestamp(routes: Route[]) {
 	return routes.sort((a, b) => new Date(a.lastUpdated).getTime() - new Date(b.lastUpdated).getTime());
 }
 
-export function delay(ms: number) {
-	return new Promise((resolve) => {
-		setTimeout(resolve, ms);
-	});
-}
-
 export function generateOutageTag(routeType: Route['routeType']) {
 	switch (routeType) {
 		case 'Bus':
