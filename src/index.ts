@@ -21,10 +21,10 @@ export default {
 				return;
 			}
 
-			if (lastUpdatedAlerts === alerts.lastUpdated) {
-				// for some reason the lastUpdated field goes back in time...?
-				return;
-			}
+			// if (lastUpdatedAlerts === alerts.lastUpdated) {
+			// 	// for some reason the lastUpdated field goes back in time...?
+			// 	return;
+			// }
 
 			const listOfAlerts = await env.ttc_alerts.list();
 			if (listOfAlerts.keys.length === 0) {
