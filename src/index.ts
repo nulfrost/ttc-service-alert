@@ -96,8 +96,6 @@ export default {
 					return;
 				}
 
-				await delay(30000);
-
 				const { error: mediaPublishError } = await publishThreadsMediaContainer({
 					userId: env.THREADS_USER_ID,
 					accessToken: env.THREADS_ACCESS_TOKEN,
