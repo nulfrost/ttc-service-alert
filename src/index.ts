@@ -6,6 +6,7 @@ import {
 	publishThreadsMediaContainer,
 	generateOutageTag,
 	sortAlertsByTimestamp,
+	delay,
 } from './helpers/threads';
 
 export default {
@@ -94,6 +95,8 @@ export default {
 					console.log('there was an error creating the media container:', mediaContainerError.message);
 					return;
 				}
+
+				await delay(30000);
 
 				const { error: mediaPublishError } = await publishThreadsMediaContainer({
 					userId: env.THREADS_USER_ID,
