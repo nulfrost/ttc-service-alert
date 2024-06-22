@@ -1,4 +1,3 @@
-import { reportErrorWebhook } from './helpers/discord';
 import {
 	filterAlertsByAlertType,
 	fetchTTCAlerts,
@@ -38,7 +37,7 @@ export default {
 				const parsedRecentHeader = new Set(parsedRecentAlert.map((alert) => alert.headerText));
 				const newAlertsBasedOnHeaderText = alertsSortedByMostRecentTimestamp.filter((alert) => !parsedRecentHeader.has(alert.headerText));
 				if (newAlertsBasedOnHeaderText.length === 0) {
-					// no new alerts based on headings, exiting
+					// no new alerts based on content
 					console.log('no new alerts based on content, exiting');
 					return;
 				}
@@ -52,8 +51,7 @@ export default {
 				return;
 			}
 
-			// the case where lastUpdated is not in the cache and the cache is not completely empty
-			// meaning we are checking our cached result vs the new fetched results (should be different)
+			// we are checking our cached result vs the new fetched results (should be different)
 
 			console.log('no cache hit, checking for updates based on ids');
 			const parsedRecentAlertIds = new Set(parsedRecentAlert.map((alert) => alert.id));
@@ -73,7 +71,6 @@ export default {
 			});
 		} catch (error) {
 			console.error('unhandled error', error);
-			reportErrorWebhook({ webhookId: env.DISCORD_WEBHOOK_ID, webhookToken: env.DISCORD_WEBHOOK_TOKEN });
 		}
 	},
 } satisfies ExportedHandler<Env>;
