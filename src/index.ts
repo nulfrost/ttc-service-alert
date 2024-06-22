@@ -60,6 +60,7 @@ export default {
 			if (newAlertsBasedOnIds.length === 0) {
 				// no new alerts based on ids
 				console.log('no new alerts based on ids, exiting');
+				await env.ttc_alerts.put(alerts.lastUpdated, JSON.stringify(filteredAlerts));
 				return;
 			}
 
