@@ -5,6 +5,7 @@ import {
 	getMostRecentCachedAlert,
 	parseAlertValue,
 	sendThreadsPost,
+	getDifference,
 } from './helpers/threads';
 
 // TTC Alert updates can happen under these circumstances:
@@ -34,9 +35,10 @@ export default {
 
 			if (lastUpdatedAlerts !== null) {
 				console.log('cache hit, checking to see if any updates based on content');
-				const parsedRecentHeader = new Set(parsedRecentAlert.map((alert) => alert.headerText));
-				const newAlertsBasedOnHeaderText = alertsSortedByMostRecentTimestamp.filter((alert) => !parsedRecentHeader.has(alert.headerText));
-				if (newAlertsBasedOnHeaderText.length === 0) {
+
+				const diff = getDifference(alertsSortedByMostRecentTimestamp, parsedRecentAlert, 'headerText');
+
+				if (diff.length === 0) {
 					// no new alerts based on content
 					console.log('no new alerts based on content, exiting');
 					return;
@@ -44,7 +46,7 @@ export default {
 
 				await sendThreadsPost({
 					env,
-					alertsToBePosted: newAlertsBasedOnHeaderText,
+					alertsToBePosted: diff,
 					alertsToBeCached: filteredAlerts,
 					lastUpdatedTimestamp: alerts.lastUpdated,
 				});

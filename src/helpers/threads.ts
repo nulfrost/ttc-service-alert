@@ -55,6 +55,22 @@ export function sortAlertsByTimestamp(routes: Route[]) {
 	return routes.sort((a, b) => new Date(a.lastUpdated).getTime() - new Date(b.lastUpdated).getTime());
 }
 
+// thank u chatgpt
+export function getDifference<T extends Record<string, any>>(arr1: T[], arr2: T[], key: keyof T) {
+	function compareObjects(obj1: T, obj2: T, key: keyof T) {
+		return obj1[key] === obj2[key];
+	}
+
+	function findDifferences(sourceArray: T[], compareArray: T[], key: keyof T) {
+		return sourceArray.filter((sourceObject) => !compareArray.some((compareObject) => compareObjects(sourceObject, compareObject, key)));
+	}
+
+	const differences1 = findDifferences(arr1, arr2, key);
+	const differences2 = findDifferences(arr2, arr1, key);
+
+	return [...differences1, ...differences2];
+}
+
 export function generateOutageTag(routeType: Route['routeType']) {
 	switch (routeType) {
 		case 'Bus':
