@@ -73,6 +73,15 @@ export async function fetchTTCAlerts(): Promise<TTCApiResponse> {
 	return response.json();
 }
 
+export async function getMostRecentCachedAlert({ env, alerts }: { env: Env; alerts: KVNamespaceListResult<unknown, string> }) {
+	const lastCachedAlertKey = alerts.keys[alerts.keys.length - 1].name;
+	return env.ttc_alerts.get(lastCachedAlertKey);
+}
+
+export function parseAlertValue(value: string): ReturnType<typeof filterAlertsByAlertType> {
+	return JSON.parse(value);
+}
+
 export async function createThreadsMediaContainer({
 	userId,
 	accessToken,
@@ -117,4 +126,49 @@ export async function publishThreadsMediaContainer({
 	return {
 		error,
 	};
+}
+
+export async function sendThreadsPost({
+	env,
+	alertsToBePosted,
+	alertsToBeCached,
+	lastUpdatedTimestamp,
+}: {
+	env: Env;
+	alertsToBePosted: Route[];
+	alertsToBeCached: Route[];
+	lastUpdatedTimestamp: TTCApiResponse['lastUpdated'];
+}) {
+	for (const alert of alertsToBePosted) {
+		const { id, error: mediaContainerError } = await createThreadsMediaContainer({
+			userId: env.THREADS_USER_ID,
+			accessToken: env.THREADS_ACCESS_TOKEN,
+			postContent: encodeURIComponent(`
+					${generateOutageTag(alert.routeType)}
+	
+					${alert.headerText}\n
+	
+					${alert.description !== '' ? `${alert.description}\n` : ''}
+	
+				`),
+		});
+
+		if (mediaContainerError) {
+			console.log('there was an error creating the media container:', mediaContainerError.message);
+			return;
+		}
+
+		const { error: mediaPublishError } = await publishThreadsMediaContainer({
+			userId: env.THREADS_USER_ID,
+			accessToken: env.THREADS_ACCESS_TOKEN,
+			mediaContainerId: id,
+		});
+
+		if (mediaPublishError) {
+			console.log('there was an error publishing the media container' + mediaPublishError.message);
+			return;
+		}
+	}
+	console.log(`${alertsToBePosted.length} new threads post created on: ${new Date().toISOString()}`);
+	await env.ttc_alerts.put(lastUpdatedTimestamp, JSON.stringify(alertsToBeCached));
 }

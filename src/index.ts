@@ -2,11 +2,23 @@ import { reportErrorWebhook } from './helpers/discord';
 import {
 	filterAlertsByAlertType,
 	fetchTTCAlerts,
-	createThreadsMediaContainer,
-	publishThreadsMediaContainer,
-	generateOutageTag,
 	sortAlertsByTimestamp,
+	getMostRecentCachedAlert,
+	parseAlertValue,
+	sendThreadsPost,
 } from './helpers/threads';
+
+// TTC Alert updates can happen under these circumstances:
+// 1. There are new ids from the API
+// 2. There are no new ids but instead one or more of the alerts content has changed
+
+/**
+ * 1. Fetch the alerts from the TTC API
+ * 2. Check the cache against the fetched data, sometimes the lastUpdated is the same from the API but the content as changed in one of the alerts
+ * 3. If there are new alerts based on content changes, create a new threads post
+ * 4. If not, check if there are new alerts based on new ids being returned from the API
+ * 5. If there are new alerts based on new ids, create a new threads post
+ */
 
 export default {
 	async scheduled(event, env, ctx): Promise<void> {
@@ -15,159 +27,50 @@ export default {
 			const filteredAlerts = filterAlertsByAlertType([...alerts.routes, ...alerts.accessibility]);
 			const alertsSortedByMostRecentTimestamp = sortAlertsByTimestamp(filteredAlerts);
 
-			const lastUpdatedAlerts = await env.ttc_alerts.get(alerts.lastUpdated);
+			const [lastUpdatedAlerts, listOfAlerts] = await Promise.all([env.ttc_alerts.get(alerts.lastUpdated), env.ttc_alerts.list()]);
 
-			const listOfAlerts = await env.ttc_alerts.list();
+			const mostRecentAlert = await getMostRecentCachedAlert({ env, alerts: listOfAlerts });
+
+			const parsedRecentAlert = parseAlertValue(mostRecentAlert as unknown as string);
 
 			if (lastUpdatedAlerts !== null) {
-				let newAlerts;
-				console.log('looking for differences in the cache that might have been missed');
-				const mostRecentAlert = await env.ttc_alerts.get(listOfAlerts.keys[listOfAlerts.keys.length - 1].name);
-				const parsedRecentAlert: ReturnType<typeof filterAlertsByAlertType> = JSON.parse(mostRecentAlert as unknown as string);
-				const parsedRecentAlertIds = new Set(parsedRecentAlert.map((alert) => alert.id));
-				// we need to check the headerText as well, as the id might be the same but the content might be different
-				const parsedRecentAlertTitles = new Set(parsedRecentAlert.map((alert) => alert.headerText));
-				const newAlertsBasedOnIds = filteredAlerts.filter((alert) => !parsedRecentAlertIds.has(alert.id));
-				const newAlertsBasedOnTitles = filteredAlerts.filter((alert) => !parsedRecentAlertTitles.has(alert.headerText));
-
-				if (newAlertsBasedOnIds.length === 0 || newAlertsBasedOnTitles.length === 0) {
-					// no new alerts
-					console.log('no new alerts, exiting');
+				console.log('cache hit, checking to see if any updates based on content');
+				const parsedRecentHeader = new Set(parsedRecentAlert.map((alert) => alert.headerText));
+				const newAlertsBasedOnHeaderText = alertsSortedByMostRecentTimestamp.filter((alert) => !parsedRecentHeader.has(alert.headerText));
+				if (newAlertsBasedOnHeaderText.length === 0) {
+					// no new alerts based on headings, exiting
+					console.log('no new alerts based on content, exiting');
 					return;
 				}
 
-				newAlerts = [...newAlertsBasedOnIds, ...newAlertsBasedOnTitles];
-				if (newAlerts.length === 0) {
-					// no new alerts
-					return;
-				}
-
-				for (const alert of newAlerts) {
-					const { id, error: mediaContainerError } = await createThreadsMediaContainer({
-						userId: env.THREADS_USER_ID,
-						accessToken: env.THREADS_ACCESS_TOKEN,
-						postContent: encodeURIComponent(`
-							${generateOutageTag(alert.routeType)}
-
-							${alert.headerText}\n
-
-							${alert.description !== '' ? `${alert.description}\n` : ''}
-
-						`),
-					});
-
-					if (mediaContainerError) {
-						console.log('there was an error creating the media container:', mediaContainerError.message);
-						return;
-					}
-
-					const { error: mediaPublishError } = await publishThreadsMediaContainer({
-						userId: env.THREADS_USER_ID,
-						accessToken: env.THREADS_ACCESS_TOKEN,
-						mediaContainerId: id,
-					});
-
-					if (mediaPublishError) {
-						console.log('there was an error publishing the media container' + mediaPublishError.message);
-						return;
-					}
-				}
-				console.log(`${newAlerts.length} new threads post created on: ${new Date().toISOString()}`);
-				await env.ttc_alerts.put(alerts.lastUpdated, JSON.stringify(filteredAlerts));
-				return;
-			}
-
-			if (listOfAlerts.keys.length === 0) {
-				// cache is completely empty, fill it with most recent events
-				console.log('cache is empty, filling it with the most recent events');
-				for (const alert of alertsSortedByMostRecentTimestamp) {
-					const { id, error: mediaContainerError } = await createThreadsMediaContainer({
-						userId: env.THREADS_USER_ID,
-						accessToken: env.THREADS_ACCESS_TOKEN,
-						postContent: encodeURIComponent(`
-							${generateOutageTag(alert.routeType)}
-
-							${alert.headerText}\n
-
-							${alert.description !== '' ? `${alert.description}\n` : ''}
-
-						`),
-					});
-
-					if (mediaContainerError) {
-						console.log('there was an error creating the media container:', mediaContainerError.message);
-						return;
-					}
-
-					const { error: mediaPublishError } = await publishThreadsMediaContainer({
-						userId: env.THREADS_USER_ID,
-						accessToken: env.THREADS_ACCESS_TOKEN,
-						mediaContainerId: id,
-					});
-
-					if (mediaPublishError) {
-						console.log('there was an error publishing the media container:', mediaPublishError.message);
-						return;
-					}
-				}
-				await env.ttc_alerts.put(alerts.lastUpdated, JSON.stringify(filteredAlerts));
-				console.log(`${filteredAlerts.length} new threads post created on: ${new Date().toISOString()}`);
+				await sendThreadsPost({
+					env,
+					alertsToBePosted: newAlertsBasedOnHeaderText,
+					alertsToBeCached: filteredAlerts,
+					lastUpdatedTimestamp: alerts.lastUpdated,
+				});
 				return;
 			}
 
 			// the case where lastUpdated is not in the cache and the cache is not completely empty
 			// meaning we are checking our cached result vs the new fetched results (should be different)
 
-			console.log('no cache hit, checking for differences');
-			let newAlerts;
-			const mostRecentAlert = await env.ttc_alerts.get(listOfAlerts.keys[listOfAlerts.keys.length - 1].name);
-			const parsedRecentAlert: ReturnType<typeof filterAlertsByAlertType> = JSON.parse(mostRecentAlert as unknown as string);
+			console.log('no cache hit, checking for updates based on ids');
 			const parsedRecentAlertIds = new Set(parsedRecentAlert.map((alert) => alert.id));
-			// we need to check the headerText as well, as the id might be the same but the content might be different
-			const parsedRecentAlertTitles = new Set(parsedRecentAlert.map((alert) => alert.headerText));
-			const newAlertsBasedOnIds = filteredAlerts.filter((alert) => !parsedRecentAlertIds.has(alert.id));
-			const newAlertsBasedOnTitles = filteredAlerts.filter((alert) => !parsedRecentAlertTitles.has(alert.headerText));
+			const newAlertsBasedOnIds = alertsSortedByMostRecentTimestamp.filter((alert) => !parsedRecentAlertIds.has(alert.id));
 
-			if (newAlertsBasedOnIds.length === 0 || newAlertsBasedOnTitles.length === 0) {
-				// no new alerts
-				console.log('no new alerts, exiting');
+			if (newAlertsBasedOnIds.length === 0) {
+				// no new alerts based on ids
+				console.log('no new alerts based on ids, exiting');
 				return;
 			}
 
-			newAlerts = [...newAlertsBasedOnIds, ...newAlertsBasedOnTitles];
-
-			for (const alert of newAlerts) {
-				const { id, error: mediaContainerError } = await createThreadsMediaContainer({
-					userId: env.THREADS_USER_ID,
-					accessToken: env.THREADS_ACCESS_TOKEN,
-					postContent: encodeURIComponent(`
-							${generateOutageTag(alert.routeType)}
-
-							${alert.headerText}\n
-
-							${alert.description !== '' ? `${alert.description}\n` : ''}
-
-						`),
-				});
-
-				if (mediaContainerError) {
-					console.log('there was an error creating the media container:', mediaContainerError.message);
-					return;
-				}
-
-				const { error: mediaPublishError } = await publishThreadsMediaContainer({
-					userId: env.THREADS_USER_ID,
-					accessToken: env.THREADS_ACCESS_TOKEN,
-					mediaContainerId: id,
-				});
-
-				if (mediaPublishError) {
-					console.log('there was an error publishing the media container' + mediaPublishError.message);
-					return;
-				}
-			}
-			console.log(`${newAlerts.length} new threads post created on: ${new Date().toISOString()}`);
-			await env.ttc_alerts.put(alerts.lastUpdated, JSON.stringify(filteredAlerts));
+			await sendThreadsPost({
+				env,
+				alertsToBePosted: newAlertsBasedOnIds,
+				alertsToBeCached: filteredAlerts,
+				lastUpdatedTimestamp: alerts.lastUpdated,
+			});
 		} catch (error) {
 			console.error('unhandled error', error);
 			reportErrorWebhook({ webhookId: env.DISCORD_WEBHOOK_ID, webhookToken: env.DISCORD_WEBHOOK_TOKEN });
