@@ -5,7 +5,6 @@ import {
 	getMostRecentCachedAlert,
 	parseAlertValue,
 	sendThreadsPost,
-	getDifference,
 } from './helpers/threads';
 
 // TTC Alert updates can happen under these circumstances:
@@ -26,8 +25,6 @@ export default {
 			const alerts = await fetchTTCAlerts();
 			const filteredAlerts = filterAlertsByAlertType([...alerts.routes, ...alerts.accessibility]);
 			const alertsSortedByMostRecentTimestamp = sortAlertsByTimestamp(filteredAlerts);
-
-			// const [lastUpdatedAlerts, listOfAlerts] = await Promise.all([env.ttc_alerts.get(alerts.lastUpdated), env.ttc_alerts.list()]);
 
 			const listOfAlerts = await env.ttc_alerts.list();
 
