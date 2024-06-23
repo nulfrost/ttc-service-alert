@@ -21,48 +21,44 @@ import {
  */
 
 export default {
-	async scheduled(event, env, ctx): Promise<void> {
+	async scheduled(_, env, __): Promise<void> {
 		try {
 			const alerts = await fetchTTCAlerts();
 			const filteredAlerts = filterAlertsByAlertType([...alerts.routes, ...alerts.accessibility]);
 			const alertsSortedByMostRecentTimestamp = sortAlertsByTimestamp(filteredAlerts);
 
-			const [lastUpdatedAlerts, listOfAlerts] = await Promise.all([env.ttc_alerts.get(alerts.lastUpdated), env.ttc_alerts.list()]);
+			// const [lastUpdatedAlerts, listOfAlerts] = await Promise.all([env.ttc_alerts.get(alerts.lastUpdated), env.ttc_alerts.list()]);
 
-			const mostRecentAlert = await getMostRecentCachedAlert({ env, alerts: listOfAlerts });
+			const listOfAlerts = await env.ttc_alerts.list();
 
-			const parsedRecentAlert = parseAlertValue(mostRecentAlert as unknown as string);
+			const { lastCachedAlertData } = await getMostRecentCachedAlert({ env, alerts: listOfAlerts });
 
-			if (lastUpdatedAlerts !== null) {
-				console.log('cache hit, checking to see if any updates based on content');
+			const parsedRecentAlert = parseAlertValue(lastCachedAlertData as unknown as string);
 
-				const diff = getDifference(alertsSortedByMostRecentTimestamp, parsedRecentAlert, 'headerText');
+			// we are checking our cached result vs the new fetched results (should be different)
 
-				if (diff.length === 0) {
-					// no new alerts based on content
+			console.log('checking for updates based on ids');
+			const parsedRecentAlertIds = new Set(parsedRecentAlert.map((alert) => alert.id));
+			const newAlertsBasedOnIds = alertsSortedByMostRecentTimestamp.filter((alert) => !parsedRecentAlertIds.has(alert.id));
+
+			if (newAlertsBasedOnIds.length === 0) {
+				// no new alerts based on ids
+				console.log('no new alerts based on ids, checking for updates based on content');
+
+				const parsedRecentAlertTitles = new Set(parsedRecentAlert.map((alert) => alert.headerText));
+				const newAlertsBasedOnTitles = alertsSortedByMostRecentTimestamp.filter((alert) => !parsedRecentAlertTitles.has(alert.headerText));
+
+				if (newAlertsBasedOnTitles.length === 0) {
 					console.log('no new alerts based on content, exiting');
 					return;
 				}
 
 				await sendThreadsPost({
 					env,
-					alertsToBePosted: diff,
+					alertsToBePosted: newAlertsBasedOnTitles,
 					alertsToBeCached: filteredAlerts,
 					lastUpdatedTimestamp: alerts.lastUpdated,
 				});
-				return;
-			}
-
-			// we are checking our cached result vs the new fetched results (should be different)
-
-			console.log('no cache hit, checking for updates based on ids');
-			const parsedRecentAlertIds = new Set(parsedRecentAlert.map((alert) => alert.id));
-			const newAlertsBasedOnIds = alertsSortedByMostRecentTimestamp.filter((alert) => !parsedRecentAlertIds.has(alert.id));
-
-			if (newAlertsBasedOnIds.length === 0) {
-				// no new alerts based on ids
-				console.log('no new alerts based on ids, exiting');
-				await env.ttc_alerts.put(alerts.lastUpdated, JSON.stringify(filteredAlerts));
 				return;
 			}
 

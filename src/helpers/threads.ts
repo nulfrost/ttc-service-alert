@@ -91,7 +91,11 @@ export async function fetchTTCAlerts(): Promise<TTCApiResponse> {
 
 export async function getMostRecentCachedAlert({ env, alerts }: { env: Env; alerts: KVNamespaceListResult<unknown, string> }) {
 	const lastCachedAlertKey = alerts.keys[alerts.keys.length - 1].name;
-	return env.ttc_alerts.get(lastCachedAlertKey);
+	const lastCachedAlertData = await env.ttc_alerts.get(lastCachedAlertKey);
+	return {
+		lastCachedAlertKey,
+		lastCachedAlertData,
+	};
 }
 
 export function parseAlertValue(value: string): ReturnType<typeof filterAlertsByAlertType> {
