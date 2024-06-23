@@ -151,9 +151,6 @@ export async function sendThreadsPost({
 					${generateOutageTag(alert.routeType)}
 	
 					${alert.headerText}\n
-	
-					${alert.description !== '' ? `${alert.description}\n` : ''}
-	
 				`),
 		});
 
