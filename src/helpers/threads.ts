@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-const RouteSchema = z.object({
+export const RouteSchema = z.object({
 	id: z.string(),
 	priority: z.number(),
 	alertType: z.union([z.literal('SideWide'), z.literal('Planned')]),
@@ -15,13 +15,13 @@ const RouteSchema = z.object({
 	routeBranch: z.string(),
 	routeTypeSrc: z.string(),
 	routeType: z.union([z.literal('Bus'), z.literal('Subway'), z.literal('Elevator'), z.literal('Streetcar')]),
-	stopStart: z.string(),
-	stopEnd: z.string(),
+	stopStart: z.union([z.string(), z.null()]),
+	stopEnd: z.union([z.string(), z.null()]),
 	title: z.string(),
 	description: z.string(),
 	url: z.string(),
 	urlPlaceholder: z.string(),
-	accessibilty: z.string(),
+	accessibility: z.string(),
 	effect: z.union([z.literal('NO_SERVICE'), z.literal('DETOUR'), z.literal('SIGNIFICANT_DELAYS')]),
 	effectDesc: z.string(),
 	severityOrder: z.number(),
@@ -31,6 +31,14 @@ const RouteSchema = z.object({
 });
 
 type Route = z.infer<typeof RouteSchema>;
+
+export const TTCSchema = z.object({
+	total: z.number(),
+	lastUpdated: z.string(),
+	routes: z.array(RouteSchema),
+	accessibility: z.array(RouteSchema),
+});
+
 export type TTCApiResponse = {
 	total: number;
 	lastUpdated: string;

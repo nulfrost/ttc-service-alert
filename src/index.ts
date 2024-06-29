@@ -5,6 +5,7 @@ import {
 	getMostRecentCachedAlert,
 	parseAlertValue,
 	sendThreadsPost,
+	TTCSchema,
 } from './helpers/threads';
 
 // TTC Alert updates can happen under these circumstances:
@@ -23,6 +24,11 @@ export default {
 	async scheduled(_, env, __): Promise<void> {
 		try {
 			const alerts = await fetchTTCAlerts();
+			const result = TTCSchema.safeParse(alerts);
+			if (!result.success) {
+				console.log('unexpected response from TTC API, exiting');
+				return;
+			}
 			const filteredAlerts = filterAlertsByAlertType([...alerts.routes, ...alerts.accessibility]);
 			const alertsSortedByMostRecentTimestamp = sortAlertsByTimestamp(filteredAlerts);
 
@@ -35,7 +41,8 @@ export default {
 			// we are checking our cached result vs the new fetched results (should be different)
 
 			console.log('checking for updates based on ids');
-			const parsedRecentAlertIds = new Set(parsedRecentAlert.map((alert) => alert.id));
+			// sometimes ids have a -1 appended to them for some reason. take those out
+			const parsedRecentAlertIds = new Set(parsedRecentAlert.filter((alert) => !alert.id.includes('-')).map((alert) => alert.id));
 			const newAlertsBasedOnIds = alertsSortedByMostRecentTimestamp.filter((alert) => !parsedRecentAlertIds.has(alert.id));
 
 			if (newAlertsBasedOnIds.length === 0) {
