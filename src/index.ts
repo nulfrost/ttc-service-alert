@@ -5,7 +5,6 @@ import {
 	getMostRecentCachedAlert,
 	parseAlertValue,
 	sendThreadsPost,
-	TTCSchema,
 } from './helpers/threads';
 
 // TTC Alert updates can happen under these circumstances:
@@ -41,7 +40,7 @@ export default {
 
 			console.log('checking for updates based on ids');
 			// sometimes ids have a -1 appended to them for some reason. take those out
-			const parsedRecentAlertIds = new Set(parsedRecentAlert.filter((alert) => !alert.id.includes('-')).map((alert) => alert.id));
+			const parsedRecentAlertIds = new Set(parsedRecentAlert.map((alert) => alert.id));
 			const newAlertsBasedOnIds = alertsSortedByMostRecentTimestamp.filter((alert) => !parsedRecentAlertIds.has(alert.id));
 
 			if (newAlertsBasedOnIds.length === 0) {
@@ -49,7 +48,9 @@ export default {
 				console.log('no new alerts based on ids, checking for updates based on content');
 
 				const parsedRecentAlertTitles = new Set(parsedRecentAlert.map((alert) => alert.headerText));
-				const newAlertsBasedOnTitles = alertsSortedByMostRecentTimestamp.filter((alert) => !parsedRecentAlertTitles.has(alert.headerText));
+				const newAlertsBasedOnTitles = alertsSortedByMostRecentTimestamp
+					.filter((alert) => alert.headerText !== null)
+					.filter((alert) => !parsedRecentAlertTitles.has(alert.headerText));
 
 				if (newAlertsBasedOnTitles.length === 0) {
 					console.log('no new alerts based on content, exiting');
