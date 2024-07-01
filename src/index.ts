@@ -24,9 +24,8 @@ export default {
 	async scheduled(_, env, __): Promise<void> {
 		try {
 			const alerts = await fetchTTCAlerts();
-			const result = TTCSchema.safeParse(alerts);
-			if (!result.success) {
-				console.log('unexpected response from TTC API, exiting');
+			if (typeof alerts === null) {
+				console.log('null response, exiting');
 				return;
 			}
 			const filteredAlerts = filterAlertsByAlertType([...alerts.routes, ...alerts.accessibility]);
