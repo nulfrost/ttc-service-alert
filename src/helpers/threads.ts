@@ -164,6 +164,7 @@ export async function sendThreadsPost({
 
 		if (mediaContainerError) {
 			console.log('there was an error creating the media container:', mediaContainerError.message);
+			console.log(mediaContainerError);
 			return;
 		}
 

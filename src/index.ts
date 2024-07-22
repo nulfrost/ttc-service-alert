@@ -23,10 +23,7 @@ export default {
 	async scheduled(_, env, __): Promise<void> {
 		try {
 			const alerts = await fetchTTCAlerts();
-			if (typeof alerts === null) {
-				console.log('null response, exiting');
-				return;
-			}
+
 			const filteredAlerts = filterAlertsByAlertType([...alerts.routes, ...alerts.accessibility]);
 			const alertsSortedByMostRecentTimestamp = sortAlertsByTimestamp(filteredAlerts);
 
