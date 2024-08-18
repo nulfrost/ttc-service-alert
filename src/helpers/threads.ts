@@ -157,14 +157,13 @@ export async function sendThreadsPost({
 			accessToken: env.THREADS_ACCESS_TOKEN,
 			postContent: encodeURIComponent(`
 					${generateOutageTag(alert.routeType)}
-	
+
 					${alert.headerText}\n
 				`),
 		});
 
 		if (mediaContainerError) {
-			console.log('there was an error creating the media container:', mediaContainerError.message);
-			console.log(mediaContainerError);
+			console.error(`there was an error creating the media container: ${mediaContainerError.message}`);
 			return;
 		}
 
@@ -175,7 +174,7 @@ export async function sendThreadsPost({
 		});
 
 		if (mediaPublishError) {
-			console.log('there was an error publishing the media container' + mediaPublishError.message);
+			console.error(`there was an error publishing the media container: ${mediaPublishError.message}`);
 			return;
 		}
 	}

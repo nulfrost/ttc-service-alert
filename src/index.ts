@@ -35,14 +35,14 @@ export default {
 
 			// we are checking our cached result vs the new fetched results (should be different)
 
-			console.log('checking for updates based on ids');
+			console.info('checking for updates based on ids');
 			// sometimes ids have a -1 appended to them for some reason. take those out
 			const parsedRecentAlertIds = new Set(parsedRecentAlert.map((alert) => alert.id));
 			const newAlertsBasedOnIds = alertsSortedByMostRecentTimestamp.filter((alert) => !parsedRecentAlertIds.has(alert.id));
 
 			if (newAlertsBasedOnIds.length === 0) {
 				// no new alerts based on ids
-				console.log('no new alerts based on ids, checking for updates based on content');
+				console.info('no new alerts based on ids, checking for updates based on content');
 
 				const parsedRecentAlertTitles = new Set(parsedRecentAlert.map((alert) => alert.headerText));
 				const newAlertsBasedOnTitles = alertsSortedByMostRecentTimestamp
@@ -50,7 +50,7 @@ export default {
 					.filter((alert) => !parsedRecentAlertTitles.has(alert.headerText));
 
 				if (newAlertsBasedOnTitles.length === 0) {
-					console.log('no new alerts based on content, exiting');
+					console.info('no new alerts based on content, exiting');
 					return;
 				}
 
