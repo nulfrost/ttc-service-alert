@@ -70,8 +70,8 @@ crons = ["* * * * *"]
 # Bind a KV Namespace. Use KV as persistent storage for small key-value pairs.
 # Docs: https://developers.cloudflare.com/workers/wrangler/configuration/#kv-namespaces
 [[kv_namespaces]]
-binding = "ttc_alerts"
-id = "2898040dac5f4bc3abc6b861cfe6f4fa"
+binding = "ttc-service-alerts"
+id = "9dd30d2aaeb64605aa2758a7eb5f1452"
 
 # Bind an mTLS certificate. Use to present a client certificate when communicating with another service.
 # Docs: https://developers.cloudflare.com/workers/wrangler/configuration/#mtls-certificates

@@ -83,7 +83,7 @@ export async function fetchTTCAlerts(): Promise<TTCApiResponse> {
 
 export async function getMostRecentCachedAlert({ env, alerts }: { env: Env; alerts: KVNamespaceListResult<unknown, string> }) {
 	const lastCachedAlertKey = alerts.keys[alerts.keys.length - 1].name;
-	const lastCachedAlertData = await env.ttc_alerts.get(lastCachedAlertKey);
+	const lastCachedAlertData = await env['ttc-service-alerts'].get(lastCachedAlertKey);
 	return {
 		lastCachedAlertKey,
 		lastCachedAlertData,
@@ -107,7 +107,7 @@ export async function createThreadsMediaContainer({
 		`https://graph.threads.net/v1.0/${userId}/threads?media_type=text&text=${postContent}&access_token=${accessToken}`,
 		{
 			method: 'POST',
-		}
+		},
 	);
 
 	const { id, error }: { id: string; error: { message: string; type: string; code: number; fbtrace_id: string } } = await response.json();
@@ -131,7 +131,7 @@ export async function publishThreadsMediaContainer({
 		`https://graph.threads.net/v1.0/${userId}/threads_publish?creation_id=${mediaContainerId}&access_token=${accessToken}`,
 		{
 			method: 'POST',
-		}
+		},
 	);
 
 	const { error }: ThreadsErrorResponse = await response.json();
@@ -179,5 +179,9 @@ export async function sendThreadsPost({
 		}
 	}
 	console.log(`${alertsToBePosted.length} new threads post created on: ${new Date().toISOString()}`);
-	await env.ttc_alerts.put(lastUpdatedTimestamp, JSON.stringify(alertsToBeCached));
+	try {
+		await env['ttc-service-alerts'].put(lastUpdatedTimestamp, JSON.stringify(alertsToBeCached), { expirationTtl: 259200 });
+	} catch (error) {
+		console.error(error);
+	}
 }

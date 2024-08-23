@@ -27,7 +27,7 @@ export default {
 			const filteredAlerts = filterAlertsByAlertType([...alerts.routes, ...alerts.accessibility]);
 			const alertsSortedByMostRecentTimestamp = sortAlertsByTimestamp(filteredAlerts);
 
-			const listOfAlerts = await env.ttc_alerts.list();
+			const listOfAlerts = await env['ttc-service-alerts'].list();
 
 			const { lastCachedAlertData } = await getMostRecentCachedAlert({ env, alerts: listOfAlerts });
 
