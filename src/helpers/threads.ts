@@ -156,9 +156,7 @@ export async function sendThreadsPost({
 			userId: env.THREADS_USER_ID,
 			accessToken: env.THREADS_ACCESS_TOKEN,
 			postContent: encodeURIComponent(`
-					${generateOutageTag(alert.routeType)}
-
-					${alert.headerText}\n
+					${alert.headerText}
 				`),
 		});
 

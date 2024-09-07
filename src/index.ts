@@ -29,6 +29,17 @@ export default {
 
 			const listOfAlerts = await env['ttc-service-alerts'].list();
 
+			if (listOfAlerts.keys.length === 0) {
+				console.info('no cached alerts, creating a new threads post');
+				await sendThreadsPost({
+					env,
+					alertsToBePosted: alertsSortedByMostRecentTimestamp,
+					alertsToBeCached: filteredAlerts,
+					lastUpdatedTimestamp: alerts.lastUpdated,
+				});
+				return;
+			}
+
 			const { lastCachedAlertData } = await getMostRecentCachedAlert({ env, alerts: listOfAlerts });
 
 			const parsedRecentAlert = parseAlertValue(lastCachedAlertData as unknown as string);
