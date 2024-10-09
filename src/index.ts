@@ -27,61 +27,88 @@ export default {
 			const filteredAlerts = filterAlertsByAlertType([...alerts.routes, ...alerts.accessibility]);
 			const alertsSortedByMostRecentTimestamp = sortAlertsByTimestamp(filteredAlerts);
 
-			const listOfAlerts = await env['ttc-service-alerts'].list();
+			const batch: MessageSendRequest[] = alertsSortedByMostRecentTimestamp.map((alert) => ({
+				body: alert.id,
+			}));
 
-			if (listOfAlerts.keys.length === 0) {
-				console.info('no cached alerts, creating a new threads post');
-				await sendThreadsPost({
-					env,
-					alertsToBePosted: alertsSortedByMostRecentTimestamp,
-					alertsToBeCached: filteredAlerts,
-					lastUpdatedTimestamp: alerts.lastUpdated,
-				});
-				return;
-			}
+			await env.ALERT_QUEUE.sendBatch(batch);
 
-			const { lastCachedAlertData } = await getMostRecentCachedAlert({ env, alerts: listOfAlerts });
+			// const listOfAlerts = await env['ttc-service-alerts'].list();
 
-			const parsedRecentAlert = parseAlertValue(lastCachedAlertData as unknown as string);
+			// if (listOfAlerts.keys.length === 0) {
+			// 	console.info('no cached alerts, creating a new threads post');
+			// 	await sendThreadsPost({
+			// 		env,
+			// 		alertsToBePosted: alertsSortedByMostRecentTimestamp,
+			// 		alertsToBeCached: filteredAlerts,
+			// 		lastUpdatedTimestamp: alerts.lastUpdated,
+			// 	});
+			// 	return;
+			// }
 
-			// we are checking our cached result vs the new fetched results (should be different)
+			// const { lastCachedAlertData } = await getMostRecentCachedAlert({ env, alerts: listOfAlerts });
 
-			console.info('checking for updates based on ids');
-			// sometimes ids have a -1 appended to them for some reason. take those out
-			const parsedRecentAlertIds = new Set(parsedRecentAlert.map((alert) => alert.id));
-			const newAlertsBasedOnIds = alertsSortedByMostRecentTimestamp.filter((alert) => !parsedRecentAlertIds.has(alert.id));
+			// const parsedRecentAlert = parseAlertValue(lastCachedAlertData as unknown as string);
 
-			if (newAlertsBasedOnIds.length === 0) {
-				// no new alerts based on ids
-				console.info('no new alerts based on ids, checking for updates based on content');
+			// // we are checking our cached result vs the new fetched results (should be different)
 
-				const parsedRecentAlertTitles = new Set(parsedRecentAlert.map((alert) => alert.headerText));
-				const newAlertsBasedOnTitles = alertsSortedByMostRecentTimestamp
-					.filter((alert) => alert.headerText !== null)
-					.filter((alert) => !parsedRecentAlertTitles.has(alert.headerText));
+			// console.info('checking for updates based on ids');
+			// // sometimes ids have a -1 appended to them for some reason. take those out
+			// const parsedRecentAlertIds = new Set(parsedRecentAlert.map((alert) => alert.id));
+			// const newAlertsBasedOnIds = alertsSortedByMostRecentTimestamp.filter((alert) => !parsedRecentAlertIds.has(alert.id));
 
-				if (newAlertsBasedOnTitles.length === 0) {
-					console.info('no new alerts based on content, exiting');
-					return;
-				}
+			// if (newAlertsBasedOnIds.length === 0) {
+			// 	// no new alerts based on ids
+			// 	console.info('no new alerts based on ids, checking for updates based on content');
 
-				await sendThreadsPost({
-					env,
-					alertsToBePosted: newAlertsBasedOnTitles,
-					alertsToBeCached: filteredAlerts,
-					lastUpdatedTimestamp: alerts.lastUpdated,
-				});
-				return;
-			}
+			// 	const parsedRecentAlertTitles = new Set(parsedRecentAlert.map((alert) => alert.headerText));
+			// 	const newAlertsBasedOnTitles = alertsSortedByMostRecentTimestamp
+			// 		.filter((alert) => alert.headerText !== null)
+			// 		.filter((alert) => !parsedRecentAlertTitles.has(alert.headerText));
 
-			await sendThreadsPost({
-				env,
-				alertsToBePosted: newAlertsBasedOnIds,
-				alertsToBeCached: filteredAlerts,
-				lastUpdatedTimestamp: alerts.lastUpdated,
-			});
+			// 	if (newAlertsBasedOnTitles.length === 0) {
+			// 		console.info('no new alerts based on content, exiting');
+			// 		return;
+			// 	}
+
+			// 	await sendThreadsPost({
+			// 		env,
+			// 		alertsToBePosted: newAlertsBasedOnTitles,
+			// 		alertsToBeCached: filteredAlerts,
+			// 		lastUpdatedTimestamp: alerts.lastUpdated,
+			// 	});
+			// 	return;
+			// }
+
+			// await sendThreadsPost({
+			// 	env,
+			// 	alertsToBePosted: newAlertsBasedOnIds,
+			// 	alertsToBeCached: filteredAlerts,
+			// 	lastUpdatedTimestamp: alerts.lastUpdated,
+			// });
 		} catch (error) {
 			console.error('unhandled error', error);
 		}
+	},
+	async queue(batch: MessageBatch, env: Env, ctx: ExecutionContext) {
+		let currentMessageIndex = 0;
+		const processMessages = async () => {
+			while (currentMessageIndex < batch.messages.length) {
+				const message = batch.messages[currentMessageIndex];
+				currentMessageIndex++;
+
+				try {
+					await new Promise((resolve) => setTimeout(resolve, 60000));
+
+					console.log(message);
+
+					message.ack();
+				} catch (error) {
+					console.error('Error processing message:', error);
+					message.retry();
+				}
+			}
+		};
+		ctx.waitUntil(processMessages());
 	},
 } satisfies ExportedHandler<Env>;
