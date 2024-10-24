@@ -1,19 +1,15 @@
 {
-  "name": "ttc-service-alert",
-  "version": "0.0.0",
-  "private": true,
-  "scripts": {
-    "deploy": "wrangler deploy",
-    "dev": "wrangler dev --test-scheduled",
-    "start": "wrangler dev --test-scheduled",
-    "cf-typegen": "wrangler types"
-  },
-  "devDependencies": {
-    "@cloudflare/workers-types": "^4.20241004.0",
-    "typescript": "^5.6.3",
-    "wrangler": "^3.80.2"
-  },
-  "dependencies": {
-    "zod": "^3.23.8"
-  }
+	"name": "ttc-service-alert",
+	"version": "0.0.0",
+	"private": true,
+	"scripts": {
+		"dev": "npx trigger.dev@latest dev",
+		"deploy": "npx trigger.dev@latest deploy"
+	},
+	"dependencies": {
+		"@trigger.dev/sdk": "^3.0.13"
+	},
+	"devDependencies": {
+		"@trigger.dev/build": "^3.0.13"
+	}
 }
