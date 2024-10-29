@@ -84,10 +84,14 @@ async function createThreadsMediaContainer({
 	userId,
 	accessToken,
 	postContent,
+	shouldQuotePost,
+	quotePostId,
 }: {
 	userId: string;
 	accessToken: string;
 	postContent: string;
+	shouldQuotePost: boolean;
+	quotePostId: string;
 }) {
 	const response = await fetch(
 		`https://graph.threads.net/v1.0/${userId}/threads?media_type=text&text=${postContent}&access_token=${accessToken}`,
@@ -95,7 +99,6 @@ async function createThreadsMediaContainer({
 			method: 'POST',
 		},
 	);
-
 	const {
 		id,
 		error,
@@ -132,33 +135,81 @@ async function publishThreadsMediaContainer({
 	};
 }
 
+async function insertIds({ alert_id, threads_post_id }) {
+	const response = await fetch(
+		'https://api.cloudflare.com/client/v4/accounts/f9305b888ff3b829102d355476ae8793/d1/database/a5e57484-26e8-4b2f-a276-d870335be1f9/query',
+		{
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+				Authorization: `Bearer ${env.CLOUDFLARE_API_TOKEN}`,
+			},
+			body: `{"params":["${alert_id}","${threads_post_id}"],"sql":"INSERT into posts VALUES (?, ?);"}`,
+		},
+	);
+
+	return response.json();
+}
+
+async function findAlertById(alert_id) {
+	const response = await fetch(
+		'https://api.cloudflare.com/client/v4/accounts/f9305b888ff3b829102d355476ae8793/d1/database/a5e57484-26e8-4b2f-a276-d870335be1f9/query',
+		{
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+				Authorization: `Bearer ${env.CLOUDFLARE_API_TOKEN}`,
+			},
+			body: `{"params":["${alert_id}"],"sql":"SELECT alert_id, threads_post_id FROM posts WHERE alert_id = ?;"}`,
+		},
+	);
+
+	return response.json();
+}
+
 async function sendThreadsPost({ alertsToBePosted, alertsToBeCached, lastUpdatedTimestamp }) {
+	await writeDataToCloudflareKV({
+		timestamp: lastUpdatedTimestamp,
+		alerts: JSON.stringify(alertsToBeCached),
+	});
+
 	try {
-		await writeDataToCloudflareKV({
-			timestamp: lastUpdatedTimestamp,
-			alerts: JSON.stringify(alertsToBeCached),
-		});
 		for (const alert of alertsToBePosted) {
+			const data = await findAlertById(alert.id);
+
+			const quotePostId = data?.result[0]?.results[0]?.threads_post_id;
+
 			const { id, error: mediaContainerError } = await createThreadsMediaContainer({
 				userId: env.THREADS_USER_ID,
 				accessToken: env.THREADS_ACCESS_TOKEN,
+				shouldQuotePost: data?.result[0]?.results?.length !== 0,
+				quotePostId,
 				postContent: encodeURIComponent(`
-		    	${alert.headerText}
-		    `),
+			   	${alert.headerText}
+			   `),
 			});
+
+			if (data?.result[0]?.results?.length === 0) {
+				// this isn't an id that exists in the database already, we need to add it
+				await insertIds({ alert_id: +alert.id, threads_post_id: id });
+			}
+
 			if (mediaContainerError) {
 				console.error(`there was an error creating the media container: ${mediaContainerError.message}`);
 				return;
 			}
+
 			const { error: mediaPublishError } = await publishThreadsMediaContainer({
 				userId: env.THREADS_USER_ID,
 				accessToken: env.THREADS_ACCESS_TOKEN,
 				mediaContainerId: id,
 			});
+
 			if (mediaPublishError) {
 				console.error(`there was an error publishing the media container: ${mediaPublishError.message}`);
 				return;
 			}
+
 			await wait.for({ seconds: 60 });
 		}
 		console.log(`${alertsToBePosted.length} new threads post created on: ${new Date().toISOString()}`);
