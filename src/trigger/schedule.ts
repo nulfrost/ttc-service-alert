@@ -119,13 +119,20 @@ async function createThreadsMediaContainer({
 	userId,
 	accessToken,
 	postContent,
+	shouldQuotePost,
+	postQuoteId,
 }: {
 	userId: string;
 	accessToken: string;
 	postContent: string;
+	shouldQuotePost: boolean;
+	postQuoteId: string;
 }) {
+	console.log({ shouldQuotePost, postQuoteId });
 	const response = await fetch(
-		`https://graph.threads.net/v1.0/${userId}/threads?media_type=text&text=${postContent}&access_token=${accessToken}`,
+		`https://graph.threads.net/v1.0/${userId}/threads?media_type=text&text=${postContent}&access_token=${accessToken}${
+			shouldQuotePost && typeof postQuoteId !== 'undefined' ? `&quote_post_id=${postQuoteId}` : ''
+		}`,
 		{
 			method: 'POST',
 		}
@@ -160,8 +167,9 @@ async function publishThreadsMediaContainer({
 		}
 	);
 
-	const { error } = await response.json();
+	const { error, id } = await response.json();
 	return {
+		id,
 		error,
 	};
 }
@@ -240,28 +248,34 @@ async function sendThreadsPost({ alertsToBePosted, alertsToBeCached, lastUpdated
 
 	try {
 		for (const alert of alertsToBePosted) {
-			// const data = await findAlertById(alert.id);
-			// const quotePostId = data?.result[0]?.results[0]?.threads_post_id;
-			const { id, error: mediaContainerError } = await createThreadsMediaContainer({
+			const data = await findAlertById(alert.id);
+			const postQuoteId = data?.result[0]?.results[0]?.threads_post_id;
+			console.log('quoted post id', postQuoteId, 'should quote post', data?.result[0]?.results?.length !== 0);
+			const { error: mediaContainerError, id } = await createThreadsMediaContainer({
 				userId: env.THREADS_USER_ID,
 				accessToken: env.THREADS_ACCESS_TOKEN,
 				postContent: encodeURIComponent(`
 			   	${alert.headerText}
 			   `),
+				shouldQuotePost: data?.result[0]?.results?.length !== 0,
+				postQuoteId,
 			});
-			// if (data?.result[0]?.results?.length === 0) {
-			// 	// this isn't an id that exists in the database already, we need to add it
-			// 	await insertIds({ alert_id: +alert.id, threads_post_id: id });
-			// }
 			if (mediaContainerError) {
 				console.error(`there was an error creating the media container: ${mediaContainerError.message}`);
 				return;
 			}
-			const { error: mediaPublishError } = await publishThreadsMediaContainer({
+
+			const { error: mediaPublishError, id: threadsMediaId } = await publishThreadsMediaContainer({
 				userId: env.THREADS_USER_ID,
 				accessToken: env.THREADS_ACCESS_TOKEN,
 				mediaContainerId: id,
 			});
+
+			if (data?.result[0]?.results?.length === 0) {
+				// this isn't an id that exists in the database already, we need to add it
+				await insertIds({ alert_id: +alert.id, threads_post_id: threadsMediaId });
+			}
+
 			if (mediaPublishError) {
 				console.error(`there was an error publishing the media container: ${mediaPublishError.message}`);
 				return;
@@ -279,9 +293,6 @@ export const scheduledThreadsPost = schedules.task({
 	cron: {
 		pattern: '* * * * *',
 		timezone: 'America/Toronto',
-	},
-	queue: {
-		concurrencyLimit: 1,
 	},
 	run: async () => {
 		try {
