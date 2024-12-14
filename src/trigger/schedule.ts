@@ -1,7 +1,7 @@
 import { schedules } from '@trigger.dev/sdk/v3';
-import { sendThreadsPost } from '../threads';
+import { sendThreadsPost } from '~/threads';
 import { destringify, fetchTTCAlerts, filterAlertsByAlertType, getMostRecentCachedAlert, sortAlertsByTimestamp } from '../utils';
-import { listKVKeys } from '../cloudflare';
+import { listKVKeys } from '~/cloudflare';
 
 export const scheduledThreadsPost = schedules.task({
 	id: 'scheduled-threads-post',

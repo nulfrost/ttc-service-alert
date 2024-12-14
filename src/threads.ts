@@ -1,7 +1,7 @@
 import { wait } from '@trigger.dev/sdk/v3';
-import { findTransitAlertById, insertIds, writeDataToCloudflareKV } from './cloudflare';
-import { env } from './config';
-import type { SendThreadsPostParams, ThreadsApiResponse } from './types';
+import { findTransitAlertById, insertIds, writeDataToCloudflareKV } from '~/cloudflare';
+import { env } from '~/config';
+import type { SendThreadsPostParams, ThreadsApiResponse } from '~/types';
 
 export async function createThreadsMediaContainer({
 	userId,

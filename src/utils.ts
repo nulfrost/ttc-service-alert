@@ -1,5 +1,5 @@
-import { getValueByKey } from './cloudflare';
-import type { CloudflareKVResponse, Route, TTCApiResponse } from './types';
+import { getValueByKey } from '~/cloudflare';
+import type { CloudflareKVResponse, Route, TTCApiResponse } from '~/types';
 
 export function stringify<T>(data: T) {
 	return JSON.stringify(data);

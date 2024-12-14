@@ -1,6 +1,6 @@
-import { stringify } from './utils';
-import { env } from './config';
-import type { CloudflareKVResponse, Route } from './types';
+import { stringify } from '~/utils';
+import { env } from '~/config';
+import type { CloudflareKVResponse, Route } from '~/types';
 
 export async function writeDataToCloudflareKV({ timestamp, alerts }: { timestamp: string; alerts: Route[] }) {
 	try {
