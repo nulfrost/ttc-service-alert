@@ -65,7 +65,7 @@ export async function publishThreadsMediaContainer({
 export async function sendThreadsPost({ alertsToBePosted, alertsToBeCached, lastUpdatedTimestamp }: SendThreadsPostParams) {
 	await writeDataToCloudflareKV({
 		timestamp: lastUpdatedTimestamp,
-		alerts: alertsToBeCached,
+		alerts: JSON.stringify(alertsToBeCached),
 	});
 
 	try {
