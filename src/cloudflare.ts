@@ -116,7 +116,7 @@ async function updatePaginatedCursor(cursor: string) {
 				'Content-Type': 'application/json',
 				Authorization: `Bearer ${env.CLOUDFLARE_API_TOKEN}`,
 			},
-			body: `{"params":["${cursor}"],"sql":"INSERT into cursors VALUES (?) ON CONFLICT DO UPDATE SET cursor=${cursor};"}`,
+			body: `{"params":["${cursor}"],"sql":"UPDATE cursors SET cursor = ? WHERE id = 1;"}`,
 		}
 	);
 
