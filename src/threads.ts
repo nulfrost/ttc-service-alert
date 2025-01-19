@@ -2,63 +2,80 @@ import { wait } from '@trigger.dev/sdk/v3';
 import { findTransitAlertById, insertIds, writeDataToCloudflareKV } from '~/cloudflare';
 import { env } from '~/config';
 import type { SendThreadsPostParams, ThreadsApiResponse } from '~/types';
+import { ofetch } from 'ofetch';
+
+const threadsFetchInstance = ofetch.create({
+	baseURL: 'https://graph.threads.net/v1.0/',
+	async onRequest({ options }) {
+		console.log('[threads api request]', options.query);
+		options.query = options.query || {};
+		options.query.access_token = env.THREADS_ACCESS_TOKEN;
+	},
+	async onResponse({ response }) {
+		const { id, error }: ThreadsApiResponse = await response.json();
+		if (error && error.message) {
+			console.error(`[threads api error]: there was an error while publishing to threads -> ID: ${id} <> ${error.message}`);
+		}
+	},
+});
 
 export async function createThreadsMediaContainer({
 	userId,
-	accessToken,
 	postContent,
 	shouldQuotePost,
 	postQuoteId,
 }: {
 	userId: string;
-	accessToken: string;
 	postContent: string;
 	shouldQuotePost: boolean;
 	postQuoteId: string;
 }) {
 	console.log({ shouldQuotePost, postQuoteId });
-	const response = await fetch(
-		`https://graph.threads.net/v1.0/${userId}/threads?media_type=text&text=${postContent}&access_token=${accessToken}${
-			shouldQuotePost && typeof postQuoteId !== 'undefined' ? `&quote_post_id=${postQuoteId}` : ''
-		}`,
-		{
-			method: 'POST',
-		}
-	);
-	const {
-		id,
-		error,
-	}: {
-		id: string;
-		error: { message: string; type: string; code: number; fbtrace_id: string };
-	} = await response.json();
+	//const response = await fetch(
+	//	`https://graph.threads.net/v1.0/${userId}/threads?media_type=text&text=${postContent}&access_token=${accessToken}${
+	//		shouldQuotePost && typeof postQuoteId !== 'undefined' ? `&quote_post_id=${postQuoteId}` : ''
+	//	}`,
+	//	{
+	//		method: 'POST',
+	//	},
+	//);
+	//const {
+	//	id,
+	//	error,
+	//}: {
+	//	id: string;
+	//	error: { message: string; type: string; code: number; fbtrace_id: string };
+	//} = await response.json();
+	//
 
+	const { id } = await threadsFetchInstance<ThreadsApiResponse>(
+		`${userId}/threads?media_type=text&text=${postContent}${shouldQuotePost && typeof postQuoteId !== 'undefined' ? `&quote_post_id=${postQuoteId}` : ''}`,
+		{ method: 'POST' },
+	);
 	return {
 		id,
-		error,
 	};
 }
 
-export async function publishThreadsMediaContainer({
-	userId,
-	mediaContainerId,
-	accessToken,
-}: {
-	userId: string;
-	mediaContainerId: string;
-	accessToken: string;
-}): Promise<ThreadsApiResponse> {
-	const response = await fetch(
-		`https://graph.threads.net/v1.0/${userId}/threads_publish?creation_id=${mediaContainerId}&access_token=${accessToken}`,
-		{
-			method: 'POST',
-		}
-	);
+export async function publishThreadsMediaContainer({ userId, mediaContainerId }: { userId: string; mediaContainerId: string }) {
+	//const response = await fetch(
+	//	`https://graph.threads.net/v1.0/${userId}/threads_publish?creation_id=${mediaContainerId}&access_token=${accessToken}`,
+	//	{
+	//		method: 'POST',
+	//	},
+	//);
+	//
+	//const { error, id } = await response.json();
+	//return {
+	//	id,
+	//	error,
+	//};
+	const { id } = await threadsFetchInstance<ThreadsApiResponse>(`${userId}/threads_publish?creation_id=${mediaContainerId}`, {
+		method: 'POST',
+	});
 
-	const { error, id } = await response.json();
 	return {
 		id,
-		error,
 	};
 }
 
@@ -73,23 +90,17 @@ export async function sendThreadsPost({ alertsToBePosted, alertsToBeCached, last
 			const data = await findTransitAlertById(alert.id);
 			const postQuoteId = data?.result[0]?.results[0]?.threads_post_id;
 			console.log('quoted post id', postQuoteId, 'should quote post', data?.result[0]?.results?.length !== 0);
-			const { error: mediaContainerError, id } = await createThreadsMediaContainer({
+			const { id } = await createThreadsMediaContainer({
 				userId: env.THREADS_USER_ID,
-				accessToken: env.THREADS_ACCESS_TOKEN,
 				postContent: encodeURIComponent(`
 				${alert.headerText}
 			   `),
 				shouldQuotePost: data?.result[0]?.results?.length !== 0,
 				postQuoteId,
 			});
-			if (mediaContainerError) {
-				console.error(`there was an error creating the media container: ${mediaContainerError.message}`);
-				return;
-			}
 
-			const { error: mediaPublishError, id: threadsMediaId } = await publishThreadsMediaContainer({
+			const { id: threadsMediaId } = await publishThreadsMediaContainer({
 				userId: env.THREADS_USER_ID,
-				accessToken: env.THREADS_ACCESS_TOKEN,
 				mediaContainerId: id,
 			});
 
@@ -98,10 +109,6 @@ export async function sendThreadsPost({ alertsToBePosted, alertsToBeCached, last
 				await insertIds({ alert_id: +alert.id, threads_post_id: threadsMediaId });
 			}
 
-			if (mediaPublishError) {
-				console.error(`there was an error publishing the media container: ${mediaPublishError.message}`);
-				return;
-			}
 			await wait.for({ seconds: 60 });
 		}
 		console.log(`${alertsToBePosted.length} new threads post created on: ${new Date().toISOString()}`);
