@@ -32,6 +32,8 @@ export const RouteSchema = v.object({
 
 export type Route = v.InferInput<typeof RouteSchema>;
 
+export interface D1Response {}
+
 export interface CloudflareKVResponse {
 	errors: {
 		code: number;
