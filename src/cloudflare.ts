@@ -7,7 +7,12 @@ const cloudflareFetchInstance = ofetch.create({
 	baseURL:
 		"https://api.cloudflare.com/client/v4/accounts/f9305b888ff3b829102d355476ae8793/",
 	async onResponse({ response }) {
-		const data = await response.json();
+		if (response?._data?.success === false) {
+			console.error("Cloudflare API error:", response._data);
+			throw new Error(
+				`Cloudflare API error: ${JSON.stringify(response._data)}`,
+			);
+		}
 	},
 });
 
@@ -18,8 +23,8 @@ export async function writeDataToCloudflareKV({
 	try {
 		const stringifiedAlertData = stringify(alerts);
 
-		await fetch(
-			`https://api.cloudflare.com/client/v4/accounts/f9305b888ff3b829102d355476ae8793/storage/kv/namespaces/f5267b57827b4e92bfdfca2f129c0606/values/${timestamp}`,
+		await cloudflareFetchInstance(
+			`storage/kv/namespaces/f5267b57827b4e92bfdfca2f129c0606/values/${timestamp}`,
 			{
 				method: "PUT",
 				headers: {
@@ -30,32 +35,17 @@ export async function writeDataToCloudflareKV({
 			},
 		);
 	} catch (error) {
-		console.error(error);
+		console.error("Error writing data to Cloudflare KV:", error);
+		throw error;
 	}
 }
 
 export async function listKVKeys() {
-	const cursor = await getPaginatedCursor();
+	try {
+		const cursor = await getPaginatedCursor();
 
-	// we need to check if the result_info.count is equal to 1000, it means we've reached the limit for the current page
-	// a cursor is returned at this point which we need to use for the next page(s)
-	const response = await fetch(
-		`https://api.cloudflare.com/client/v4/accounts/f9305b888ff3b829102d355476ae8793/storage/kv/namespaces/f5267b57827b4e92bfdfca2f129c0606/keys${
-			typeof cursor !== "undefined" ? `?cursor=${cursor}` : ""
-		}`,
-		{
-			headers: {
-				"Content-Type": "application/json",
-				Authorization: `Bearer ${env.CLOUDFLARE_API_TOKEN}`,
-			},
-		},
-	);
-
-	const data: CloudflareKVResponse = await response.json();
-
-	if (data.result_info.count === 1000 && data.result_info.cursor !== "") {
-		const response = await fetch(
-			`https://api.cloudflare.com/client/v4/accounts/f9305b888ff3b829102d355476ae8793/storage/kv/namespaces/f5267b57827b4e92bfdfca2f129c0606/keys?cursor=${data?.result_info?.cursor}`,
+		const data = await cloudflareFetchInstance<CloudflareKVResponse>(
+			`storage/kv/namespaces/f5267b57827b4e92bfdfca2f129c0606/keys${typeof cursor !== "undefined" ? `?cursor=${cursor}` : ""}`,
 			{
 				headers: {
 					"Content-Type": "application/json",
@@ -63,26 +53,46 @@ export async function listKVKeys() {
 				},
 			},
 		);
-		await updatePaginatedCursor(data?.result_info?.cursor);
 
-		return response.json();
+		if (data.result_info.count === 1000 && data.result_info.cursor !== "") {
+			const newPageData = await cloudflareFetchInstance<CloudflareKVResponse>(
+				`storage/kv/namespaces/f5267b57827b4e92bfdfca2f129c0606/keys?cursor=${data?.result_info?.cursor}`,
+				{
+					headers: {
+						"Content-Type": "application/json",
+						Authorization: `Bearer ${env.CLOUDFLARE_API_TOKEN}`,
+					},
+				},
+			);
+			await updatePaginatedCursor(data.result_info?.cursor);
+
+			return newPageData;
+		}
+
+		return data;
+	} catch (error) {
+		console.error("Error listing KV keys:", error);
+		throw error;
 	}
-
-	return data;
 }
 
 export async function getValueByKey(key: string): Promise<string> {
-	const response = await fetch(
-		`https://api.cloudflare.com/client/v4/accounts/f9305b888ff3b829102d355476ae8793/storage/kv/namespaces/f5267b57827b4e92bfdfca2f129c0606/values/${key}`,
-		{
-			headers: {
-				"Content-Type": "application/json",
-				Authorization: `Bearer ${env.CLOUDFLARE_API_TOKEN}`,
+	try {
+		const response = await cloudflareFetchInstance(
+			`storage/kv/namespaces/f5267b57827b4e92bfdfca2f129c0606/values/${key}`,
+			{
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: `Bearer ${env.CLOUDFLARE_API_TOKEN}`,
+				},
 			},
-		},
-	);
+		);
 
-	return response.json();
+		return response;
+	} catch (error) {
+		console.error(`Error getting value for key ${key}:`, error);
+		throw error;
+	}
 }
 
 export async function insertIds({
@@ -90,8 +100,8 @@ export async function insertIds({
 	threads_post_id,
 }: { alert_id: number; threads_post_id: string }) {
 	try {
-		await fetch(
-			"https://api.cloudflare.com/client/v4/accounts/f9305b888ff3b829102d355476ae8793/d1/database/a5e57484-26e8-4b2f-a276-d870335be1f9/query",
+		await cloudflareFetchInstance(
+			"d1/database/a5e57484-26e8-4b2f-a276-d870335be1f9/query",
 			{
 				method: "POST",
 				headers: {
@@ -102,56 +112,70 @@ export async function insertIds({
 			},
 		);
 	} catch (error) {
-		console.error(error);
+		console.error("Error inserting IDs:", error);
+		throw error;
 	}
 }
 
 export async function findTransitAlertById(alert_id: string) {
-	const response = await fetch(
-		"https://api.cloudflare.com/client/v4/accounts/f9305b888ff3b829102d355476ae8793/d1/database/a5e57484-26e8-4b2f-a276-d870335be1f9/query",
-		{
-			method: "POST",
-			headers: {
-				"Content-Type": "application/json",
-				Authorization: `Bearer ${env.CLOUDFLARE_API_TOKEN}`,
+	try {
+		const response = await cloudflareFetchInstance(
+			"d1/database/a5e57484-26e8-4b2f-a276-d870335be1f9/query",
+			{
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: `Bearer ${env.CLOUDFLARE_API_TOKEN}`,
+				},
+				body: `{"params":["${alert_id}"],"sql":"SELECT alert_id, threads_post_id FROM posts WHERE alert_id = ?;"}`,
 			},
-			body: `{"params":["${alert_id}"],"sql":"SELECT alert_id, threads_post_id FROM posts WHERE alert_id = ?;"}`,
-		},
-	);
+		);
 
-	return response.json();
+		return response;
+	} catch (error) {
+		console.error(`Error finding transit alert for ID ${alert_id}:`, error);
+		throw error;
+	}
 }
 
 async function updatePaginatedCursor(cursor: string) {
-	const response = await fetch(
-		"https://api.cloudflare.com/client/v4/accounts/f9305b888ff3b829102d355476ae8793/d1/database/dedb959d-8767-464a-8030-b9a58a4b92c4/query",
-		{
-			method: "POST",
-			headers: {
-				"Content-Type": "application/json",
-				Authorization: `Bearer ${env.CLOUDFLARE_API_TOKEN}`,
+	try {
+		const response = await cloudflareFetchInstance(
+			"d1/database/dedb959d-8767-464a-8030-b9a58a4b92c4/query",
+			{
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: `Bearer ${env.CLOUDFLARE_API_TOKEN}`,
+				},
+				body: `{"params":["${cursor}"],"sql":"UPDATE cursors SET cursor = ? WHERE id = 1;"}`,
 			},
-			body: `{"params":["${cursor}"],"sql":"UPDATE cursors SET cursor = ? WHERE id = 1;"}`,
-		},
-	);
+		);
 
-	return response.json();
+		return response;
+	} catch (error) {
+		console.error("Error updating paginated cursor:", error);
+		throw error;
+	}
 }
 
 async function getPaginatedCursor() {
-	const response = await fetch(
-		"https://api.cloudflare.com/client/v4/accounts/f9305b888ff3b829102d355476ae8793/d1/database/dedb959d-8767-464a-8030-b9a58a4b92c4/query",
-		{
-			method: "POST",
-			headers: {
-				"Content-Type": "application/json",
-				Authorization: `Bearer ${env.CLOUDFLARE_API_TOKEN}`,
+	try {
+		const response = await cloudflareFetchInstance(
+			"d1/database/dedb959d-8767-464a-8030-b9a58a4b92c4/query",
+			{
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: `Bearer ${env.CLOUDFLARE_API_TOKEN}`,
+				},
+				body: '{"sql":"SELECT * FROM cursors ORDER BY id DESC LIMIT 1;"}',
 			},
-			body: `{"sql":"SELECT * FROM cursors ORDER BY id DESC LIMIT 1;"}`,
-		},
-	);
+		);
 
-	const data = await response.json();
-
-	return data.result[0].results[0].cursor;
+		return response.result[0].results[0].cursor;
+	} catch (error) {
+		console.error("Error getting paginated cursor:", error);
+		throw error;
+	}
 }

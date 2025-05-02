@@ -16,11 +16,11 @@ const threadsFetchInstance = ofetch.create({
 		options.query.access_token = env.THREADS_ACCESS_TOKEN;
 	},
 	async onResponse({ response }) {
-		const { id, error }: ThreadsApiResponse = await response.json();
-		if (error?.message) {
+		if (response._data?.error?.message) {
 			console.error(
-				`[threads api error]: there was an error while publishing to threads -> ID: ${id} <> ${error.message}`,
+				`[threads api error]: there was an error while publishing to threads -> ID: ${response._data.id} <> ${response._data?.error?.message}`,
 			);
+			throw new Error(`Threads API error: ${response._data?.error?.message}`);
 		}
 	},
 });
@@ -36,31 +36,37 @@ export async function createThreadsMediaContainer({
 	shouldQuotePost: boolean;
 	postQuoteId: string;
 }) {
-	console.log({ shouldQuotePost, postQuoteId });
-
-	const { id } = await threadsFetchInstance<ThreadsApiResponse>(
-		`${userId}/threads?media_type=text&text=${postContent}${shouldQuotePost && typeof postQuoteId !== "undefined" ? `&quote_post_id=${postQuoteId}` : ""}`,
-		{ method: "POST" },
-	);
-	return {
-		id,
-	};
+	try {
+		console.log("creating threads media container");
+		const { id } = await threadsFetchInstance<ThreadsApiResponse>(
+			`${userId}/threads?media_type=text&text=${postContent}${shouldQuotePost && typeof postQuoteId !== "undefined" ? `&quote_post_id=${postQuoteId}` : ""}`,
+			{ method: "POST" },
+		);
+		return { id };
+	} catch (error) {
+		console.error("Error creating threads media container:", error);
+		throw error;
+	}
 }
 
 export async function publishThreadsMediaContainer({
 	userId,
 	mediaContainerId,
 }: { userId: string; mediaContainerId: string }) {
-	const { id } = await threadsFetchInstance<ThreadsApiResponse>(
-		`${userId}/threads_publish?creation_id=${mediaContainerId}`,
-		{
-			method: "POST",
-		},
-	);
+	try {
+		console.log("publishing threads media container");
+		const { id } = await threadsFetchInstance<ThreadsApiResponse>(
+			`${userId}/threads_publish?creation_id=${mediaContainerId}`,
+			{
+				method: "POST",
+			},
+		);
 
-	return {
-		id,
-	};
+		return { id };
+	} catch (error) {
+		console.error("Error publishing threads media container:", error);
+		throw error;
+	}
 }
 
 export async function sendThreadsPost({
@@ -68,49 +74,57 @@ export async function sendThreadsPost({
 	alertsToBeCached,
 	lastUpdatedTimestamp,
 }: SendThreadsPostParams) {
-	await writeDataToCloudflareKV({
-		timestamp: lastUpdatedTimestamp,
-		alerts: JSON.stringify(alertsToBeCached),
-	});
-
 	try {
+		// Cache the alerts in Cloudflare KV
+		await writeDataToCloudflareKV({
+			timestamp: lastUpdatedTimestamp,
+			alerts: JSON.stringify(alertsToBeCached),
+		});
+
+		// Process each alert
 		for (const alert of alertsToBePosted) {
-			const data = await findTransitAlertById(alert.id);
-			const postQuoteId = data?.result[0]?.results[0]?.threads_post_id;
-			console.log(
-				"quoted post id",
-				postQuoteId,
-				"should quote post",
-				data?.result[0]?.results?.length !== 0,
-			);
-			const { id } = await createThreadsMediaContainer({
-				userId: env.THREADS_USER_ID,
-				postContent: encodeURIComponent(`
-				${alert.headerText}
-			   `),
-				shouldQuotePost: data?.result[0]?.results?.length !== 0,
-				postQuoteId,
-			});
+			try {
+				// Check if this alert has already been posted
+				const data = await findTransitAlertById(alert.id);
+				const postQuoteId = data?.result[0]?.results[0]?.threads_post_id;
 
-			const { id: threadsMediaId } = await publishThreadsMediaContainer({
-				userId: env.THREADS_USER_ID,
-				mediaContainerId: id,
-			});
-
-			if (data?.result[0]?.results?.length === 0) {
-				// this isn't an id that exists in the database already, we need to add it
-				await insertIds({
-					alert_id: +alert.id,
-					threads_post_id: threadsMediaId,
+				// Create the media container for the post
+				const { id } = await createThreadsMediaContainer({
+					userId: env.THREADS_USER_ID,
+					postContent: encodeURIComponent(alert.headerText),
+					shouldQuotePost: data?.result[0]?.results?.length !== 0,
+					postQuoteId,
 				});
-			}
 
-			await wait.for({ seconds: 60 });
+				// Publish the post
+				const { id: threadsMediaId } = await publishThreadsMediaContainer({
+					userId: env.THREADS_USER_ID,
+					mediaContainerId: id,
+				});
+
+				// If this is a new alert, store the mapping
+				if (data?.result[0]?.results?.length === 0) {
+					await insertIds({
+						alert_id: +alert.id,
+						threads_post_id: threadsMediaId,
+					});
+				}
+
+				console.log(`Created threads post ${threadsMediaId}`);
+
+				// Wait between posts to avoid rate limiting
+				await wait.for({ seconds: 60 });
+			} catch (error) {
+				console.error(`Error processing alert ${alert.id}:`, error);
+				// Continue with next alert even if one fails
+			}
 		}
+
 		console.log(
-			`${alertsToBePosted.length} new threads post created on: ${new Date().toISOString()}`,
+			`${alertsToBePosted.length} new threads posts created on: ${new Date().toISOString()}`,
 		);
 	} catch (error) {
-		console.error(error);
+		console.error("Error in sendThreadsPost:", error);
+		throw error;
 	}
 }
