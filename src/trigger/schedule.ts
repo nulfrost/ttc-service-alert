@@ -1,29 +1,20 @@
-import { schedules } from "@trigger.dev/sdk/v3";
-import { listKVKeys } from "~/cloudflare";
-import { sendThreadsPost } from "~/threads";
-import {
-	destringify,
-	fetchTTCAlerts,
-	filterPlannedAlerts,
-	getMostRecentCachedAlert,
-	sortAlertsByTimestamp,
-} from "../utils";
-import type { Route } from "~/types";
+import { schedules } from '@trigger.dev/sdk/v3';
+import { listKVKeys } from '~/cloudflare';
+import { sendThreadsPost } from '~/threads';
+import { destringify, fetchTTCAlerts, filterPlannedAlerts, getMostRecentCachedAlert, sortAlertsByTimestamp } from '../utils';
+import type { Route } from '~/types';
 
 export const scheduledThreadsPost = schedules.task({
-	id: "scheduled-threads-post",
+	id: 'scheduled-threads-post',
 	cron: {
-		pattern: "* * * * *", // Runs every minute
-		timezone: "America/Toronto",
+		pattern: '* * * * *', // Runs every minute
+		timezone: 'America/Toronto',
 	},
 	run: async () => {
 		try {
 			// 1. Fetch and prepare current alerts
 			const currentAlertsData = await fetchTTCAlerts();
-			const filteredCurrentAlerts = filterPlannedAlerts([
-				...currentAlertsData.routes,
-				...currentAlertsData.accessibility,
-			]);
+			const filteredCurrentAlerts = filterPlannedAlerts([...currentAlertsData.routes, ...currentAlertsData.accessibility]);
 			const sortedCurrentAlerts = sortAlertsByTimestamp(filteredCurrentAlerts);
 
 			// 2. Fetch and prepare cached alerts
@@ -34,7 +25,7 @@ export const scheduledThreadsPost = schedules.task({
 
 			// If no cached data, post all current alerts and exit
 			if (!lastCachedAlertData) {
-				console.info("No cached alerts found. Posting all current alerts.");
+				console.info('No cached alerts found. Posting all current alerts.');
 				if (sortedCurrentAlerts.length > 0) {
 					await sendThreadsPost({
 						alertsToBePosted: sortedCurrentAlerts,
@@ -42,18 +33,14 @@ export const scheduledThreadsPost = schedules.task({
 						lastUpdatedTimestamp: currentAlertsData.lastUpdated,
 					});
 				} else {
-					console.info("No current alerts to post.");
+					console.info('No current alerts to post.');
 				}
-				return { success: true, message: "Initial run or cache cleared." };
+				return { success: true, message: 'Initial run or cache cleared.' };
 			}
 
 			// Assuming lastCachedAlertData is a stringified JSON array from KV
-			const cachedAlerts: Route[] = destringify(
-				lastCachedAlertData as unknown as string,
-			);
-			const cachedAlertIds = new Map<string, Route>(
-				cachedAlerts.map((alert) => [alert.id, alert]),
-			);
+			const cachedAlerts: Route[] = destringify(lastCachedAlertData as unknown as string);
+			const cachedAlertIds = new Map<string, Route>(cachedAlerts.map((alert) => [alert.id, alert]));
 
 			// 3. Identify alerts to be posted (new or updated)
 			const alertsToPost: Route[] = [];
@@ -62,10 +49,7 @@ export const scheduledThreadsPost = schedules.task({
 				if (!cachedAlert) {
 					// New alert (ID not found in cache)
 					alertsToPost.push(currentAlert);
-				} else if (
-					currentAlert.headerText &&
-					cachedAlert.headerText !== currentAlert.headerText
-				) {
+				} else if (currentAlert.headerText && cachedAlert.headerText !== currentAlert.headerText) {
 					// Updated alert (ID found, but headerText differs)
 					alertsToPost.push(currentAlert);
 				}
@@ -73,11 +57,9 @@ export const scheduledThreadsPost = schedules.task({
 
 			// 4. Post if there are new or updated alerts
 			if (alertsToPost.length === 0) {
-				console.info("No new or updated alerts to post.");
+				console.info('No new or updated alerts to post.');
 			} else {
-				console.info(
-					`Found ${alertsToPost.length} new/updated alerts to post.`,
-				);
+				console.info(`Found ${alertsToPost.length} new/updated alerts to post.`);
 				await sendThreadsPost({
 					alertsToBePosted: alertsToPost,
 					alertsToBeCached: filteredCurrentAlerts, // Cache the latest full set
@@ -90,7 +72,7 @@ export const scheduledThreadsPost = schedules.task({
 				postedCount: alertsToPost.length,
 			};
 		} catch (error) {
-			console.error("Error in scheduled Threads post task:", error);
+			console.error('Error in scheduled Threads post task:', error);
 			// Re-throw the error to mark the task run as failed in Trigger.dev
 			throw error;
 		}
