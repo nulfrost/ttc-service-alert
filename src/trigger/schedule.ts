@@ -1,4 +1,4 @@
-import { schedules } from '@trigger.dev/sdk/v3';
+import { schedules, logger } from '@trigger.dev/sdk/v3';
 import { listKVKeys } from '~/cloudflare';
 import { sendThreadsPost } from '~/threads';
 import { destringify, fetchTTCAlerts, filterPlannedAlerts, getMostRecentCachedAlert, sortAlertsByTimestamp } from '../utils';
@@ -33,7 +33,7 @@ export const scheduledThreadsPost = schedules.task({
 						lastUpdatedTimestamp: currentAlertsData.lastUpdated,
 					});
 				} else {
-					console.info('No current alerts to post.');
+					logger.info('No current alerts to post.');
 				}
 				return { success: true, message: 'Initial run or cache cleared.' };
 			}
@@ -57,9 +57,9 @@ export const scheduledThreadsPost = schedules.task({
 
 			// 4. Post if there are new or updated alerts
 			if (alertsToPost.length === 0) {
-				console.info('No new or updated alerts to post.');
+				logger.info('No new or updated alerts to post.');
 			} else {
-				console.info(`Found ${alertsToPost.length} new/updated alerts to post.`);
+				logger.info(`Found ${alertsToPost.length} new/updated alerts to post.`);
 				await sendThreadsPost({
 					alertsToBePosted: alertsToPost,
 					alertsToBeCached: filteredCurrentAlerts, // Cache the latest full set
@@ -72,7 +72,7 @@ export const scheduledThreadsPost = schedules.task({
 				postedCount: alertsToPost.length,
 			};
 		} catch (error) {
-			console.error('Error in scheduled Threads post task:', error);
+			logger.error('Error in scheduled Threads post task:', { error });
 			// Re-throw the error to mark the task run as failed in Trigger.dev
 			throw error;
 		}

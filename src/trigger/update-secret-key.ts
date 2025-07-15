@@ -27,6 +27,8 @@ export const updateSecretKey = schedules.task({
 				"there was an error updating the threads access token",
 				error,
 			);
+
+			throw error
 		}
 	},
 });

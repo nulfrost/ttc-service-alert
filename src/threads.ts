@@ -1,4 +1,4 @@
-import { wait } from "@trigger.dev/sdk/v3";
+import { wait, logger } from "@trigger.dev/sdk/v3";
 import { ofetch } from "ofetch";
 import {
 	findTransitAlertById,
@@ -17,7 +17,7 @@ const threadsFetchInstance = ofetch.create({
 	},
 	async onResponse({ response }) {
 		if (response._data?.error?.message) {
-			console.error(
+			logger.error(
 				`[threads api error]: there was an error while publishing to threads -> ID: ${response._data.id} <> ${response._data?.error?.message}`,
 			);
 			throw new Error(`Threads API error: ${response._data?.error?.message}`);
@@ -38,14 +38,14 @@ export async function createThreadsMediaContainer({
 	postQuoteId: string;
 }) {
 	try {
-		console.log("creating threads media container");
+		logger.info("creating threads media container");
 		const { id } = await threadsFetchInstance<ThreadsApiResponse>(
 			`${userId}/threads?media_type=text&text=${postContent}${shouldQuotePost && typeof postQuoteId !== "undefined" ? `&quote_post_id=${postQuoteId}` : ""}`,
 			{ method: "POST" },
 		);
 		return { id };
 	} catch (error) {
-		console.error("Error creating threads media container:", error);
+		logger.error("Error creating threads media container:", { error });
 		throw error;
 	}
 }
@@ -55,7 +55,7 @@ export async function publishThreadsMediaContainer({
 	mediaContainerId,
 }: { userId: string; mediaContainerId: string }) {
 	try {
-		console.log("publishing threads media container");
+		logger.info("publishing threads media container");
 		const { id } = await threadsFetchInstance<ThreadsApiResponse>(
 			`${userId}/threads_publish?creation_id=${mediaContainerId}`,
 			{
@@ -65,7 +65,7 @@ export async function publishThreadsMediaContainer({
 
 		return { id };
 	} catch (error) {
-		console.error("Error publishing threads media container:", error);
+		logger.error("Error publishing threads media container:", { error });
 		throw error;
 	}
 }
@@ -87,7 +87,7 @@ export async function sendThreadsPost({
 			try {
 				// Validate alert content before posting
 				if (!alert || typeof alert !== "object") {
-					console.error("Invalid alert object:", alert);
+					logger.error("Invalid alert object:", { error: alert });
 					continue;
 				}
 
@@ -96,7 +96,7 @@ export async function sendThreadsPost({
 					typeof alert.headerText !== "string" ||
 					alert.headerText.trim() === ""
 				) {
-					console.error(
+					logger.error(
 						`Skipping alert ${alert.id}: Invalid or empty headerText`,
 					);
 					continue;
@@ -133,16 +133,16 @@ export async function sendThreadsPost({
 				// Wait between posts to avoid rate limiting
 				await wait.for({ seconds: 60 });
 			} catch (error) {
-				console.error(`Error processing alert ${alert.id}:`, error);
+				logger.error(`Error processing alert ${alert.id}:`, { error });
 				// Continue with next alert even if one fails
 			}
 		}
 
-		console.log(
+		logger.info(
 			`${alertsToBePosted.length} new threads posts created on: ${new Date().toISOString()}`,
 		);
 	} catch (error) {
-		console.error("Error in sendThreadsPost:", error);
+		logger.error("Error in sendThreadsPost:", { error });
 		throw error;
 	}
 }

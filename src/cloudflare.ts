@@ -1,3 +1,4 @@
+import { logger } from '@trigger.dev/sdk/v3';
 import { ofetch } from 'ofetch';
 import { env } from '~/config';
 import type { CloudflareKVResponse } from '~/types';
@@ -11,7 +12,7 @@ const cloudflareFetchInstance = ofetch.create({
 	},
 	async onResponse({ response }) {
 		if (response?._data?.success === false) {
-			console.error('Cloudflare API error:', response._data);
+			logger.error('Cloudflare API error:', { error: response._data });
 			throw new Error(`Cloudflare API error: ${JSON.stringify(response._data)}`);
 		}
 	},
@@ -27,7 +28,7 @@ export async function writeDataToCloudflareKV({ timestamp, alerts }: { timestamp
 			body: stringifiedAlertData,
 		});
 	} catch (error) {
-		console.error('Error writing data to Cloudflare KV:', error);
+		logger.error('Error writing data to Cloudflare KV:', { error });
 		throw error;
 	}
 }
@@ -51,7 +52,7 @@ export async function listKVKeys() {
 
 		return data;
 	} catch (error) {
-		console.error('Error listing KV keys:', error);
+		logger.error('Error listing KV keys:', { error });
 		throw error;
 	}
 }
@@ -62,7 +63,7 @@ export async function getValueByKey(key: string): Promise<string> {
 
 		return response;
 	} catch (error) {
-		console.error(`Error getting value for key ${key}:`, error);
+		logger.error(`Error getting value for key ${key}:`, { error });
 		throw error;
 	}
 }
@@ -74,7 +75,7 @@ export async function insertIds({ alert_id, threads_post_id }: { alert_id: numbe
 			body: `{"params":["${alert_id}","${threads_post_id}"],"sql":"INSERT into posts VALUES (?, ?);"}`,
 		});
 	} catch (error) {
-		console.error('Error inserting IDs:', error);
+		logger.error('Error inserting IDs:', { error });
 		throw error;
 	}
 }
@@ -88,7 +89,7 @@ export async function findTransitAlertById(alert_id: string) {
 
 		return response;
 	} catch (error) {
-		console.error(`Error finding transit alert for ID ${alert_id}:`, error);
+		logger.error(`Error finding transit alert for ID ${alert_id}:`, { error });
 		throw error;
 	}
 }
@@ -102,7 +103,7 @@ async function updatePaginatedCursor(cursor: string) {
 
 		return response;
 	} catch (error) {
-		console.error('Error updating paginated cursor:', error);
+		logger.error('Error updating paginated cursor:', { error });
 		throw error;
 	}
 }
@@ -116,7 +117,7 @@ async function getPaginatedCursor() {
 
 		return response.result[0].results[0].cursor;
 	} catch (error) {
-		console.error('Error getting paginated cursor:', error);
+		logger.error('Error getting paginated cursor:', { error });
 		throw error;
 	}
 }
