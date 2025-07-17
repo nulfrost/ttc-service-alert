@@ -7,6 +7,7 @@ import {
 } from "~/cloudflare";
 import { env } from "~/config";
 import type { SendThreadsPostParams, ThreadsApiResponse } from "~/types";
+import { reportErrorToDiscord } from "./webhooks";
 
 const threadsFetchInstance = ofetch.create({
 	baseURL: "https://graph.threads.net/v1.0/",
@@ -46,6 +47,7 @@ export async function createThreadsMediaContainer({
 		return { id };
 	} catch (error) {
 		logger.error("Error creating threads media container:", { error });
+		await reportErrorToDiscord({ title: 'could not created threads media container', description: JSON.stringify(error) })
 		throw error;
 	}
 }
@@ -66,6 +68,7 @@ export async function publishThreadsMediaContainer({
 		return { id };
 	} catch (error) {
 		logger.error("Error publishing threads media container:", { error });
+		await reportErrorToDiscord({ title: 'could not publish threads media container', description: JSON.stringify(error) })
 		throw error;
 	}
 }
@@ -143,6 +146,7 @@ export async function sendThreadsPost({
 		);
 	} catch (error) {
 		logger.error("Error in sendThreadsPost:", { error });
+		await reportErrorToDiscord({ title: 'failure in sendThreadsPost', description: JSON.stringify(error) })
 		throw error;
 	}
 }

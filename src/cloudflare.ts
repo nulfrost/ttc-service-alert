@@ -3,6 +3,7 @@ import { ofetch } from 'ofetch';
 import { env } from '~/config';
 import type { CloudflareKVResponse } from '~/types';
 import { stringify } from '~/utils';
+import { reportErrorToDiscord } from './webhooks';
 
 const cloudflareFetchInstance = ofetch.create({
 	baseURL: 'https://api.cloudflare.com/client/v4/accounts/f9305b888ff3b829102d355476ae8793/',
@@ -29,6 +30,7 @@ export async function writeDataToCloudflareKV({ timestamp, alerts }: { timestamp
 		});
 	} catch (error) {
 		logger.error('Error writing data to Cloudflare KV:', { error });
+		await reportErrorToDiscord({ title: 'could not write to cloudflare kv', description: JSON.stringify(error) })
 		throw error;
 	}
 }
@@ -53,6 +55,7 @@ export async function listKVKeys() {
 		return data;
 	} catch (error) {
 		logger.error('Error listing KV keys:', { error });
+		await reportErrorToDiscord({ title: 'could not list kv keys', description: JSON.stringify(error) })
 		throw error;
 	}
 }
@@ -64,6 +67,7 @@ export async function getValueByKey(key: string): Promise<string> {
 		return response;
 	} catch (error) {
 		logger.error(`Error getting value for key ${key}:`, { error });
+		await reportErrorToDiscord({ title: `could not get value for key ${key}`, description: JSON.stringify(error) })
 		throw error;
 	}
 }
@@ -76,6 +80,7 @@ export async function insertIds({ alert_id, threads_post_id }: { alert_id: numbe
 		});
 	} catch (error) {
 		logger.error('Error inserting IDs:', { error });
+		await reportErrorToDiscord({ title: 'could not insert ID to database', description: JSON.stringify(error) })
 		throw error;
 	}
 }
@@ -90,6 +95,7 @@ export async function findTransitAlertById(alert_id: string) {
 		return response;
 	} catch (error) {
 		logger.error(`Error finding transit alert for ID ${alert_id}:`, { error });
+		await reportErrorToDiscord({ title: `could not find alert for ID ${alert_id}`, description: JSON.stringify(error) })
 		throw error;
 	}
 }
@@ -104,6 +110,7 @@ async function updatePaginatedCursor(cursor: string) {
 		return response;
 	} catch (error) {
 		logger.error('Error updating paginated cursor:', { error });
+		await reportErrorToDiscord({ title: 'could update paginated cursor', description: JSON.stringify(error) })
 		throw error;
 	}
 }
@@ -118,6 +125,7 @@ async function getPaginatedCursor() {
 		return response.result[0].results[0].cursor;
 	} catch (error) {
 		logger.error('Error getting paginated cursor:', { error });
+		await reportErrorToDiscord({ title: 'could not get paginated cursor', description: JSON.stringify(error) })
 		throw error;
 	}
 }

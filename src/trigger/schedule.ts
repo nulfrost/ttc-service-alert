@@ -3,6 +3,7 @@ import { listKVKeys } from '~/cloudflare';
 import { sendThreadsPost } from '~/threads';
 import { destringify, fetchTTCAlerts, filterPlannedAlerts, getMostRecentCachedAlert, sortAlertsByTimestamp } from '../utils';
 import type { Route } from '~/types';
+import { reportErrorToDiscord } from '~/webhooks';
 
 export const scheduledThreadsPost = schedules.task({
 	id: 'scheduled-threads-post',
@@ -73,6 +74,7 @@ export const scheduledThreadsPost = schedules.task({
 			};
 		} catch (error) {
 			logger.error('Error in scheduled Threads post task:', { error });
+			await reportErrorToDiscord({ title: 'failed to post to threads', description: JSON.stringify(error) })
 			// Re-throw the error to mark the task run as failed in Trigger.dev
 			throw error;
 		}
