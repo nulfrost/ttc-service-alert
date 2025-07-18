@@ -1,4 +1,4 @@
-import { wait, logger } from "@trigger.dev/sdk/v3";
+import { wait, logger, retry } from "@trigger.dev/sdk/v3";
 import { ofetch } from "ofetch";
 import {
 	findTransitAlertById,
@@ -58,14 +58,21 @@ export async function publishThreadsMediaContainer({
 }: { userId: string; mediaContainerId: string }) {
 	try {
 		logger.info("publishing threads media container");
-		const { id } = await threadsFetchInstance<ThreadsApiResponse>(
-			`${userId}/threads_publish?creation_id=${mediaContainerId}`,
-			{
-				method: "POST",
-			},
-		);
+		const result = await retry.onThrow(
+			async () => {
+				const { id } = await threadsFetchInstance<ThreadsApiResponse>(
+					`${userId}/threads_publish?creation_id=${mediaContainerId}`,
+					{
+						method: "POST",
+					},
+				)
+				return {
+					id
+				}
+			}, { maxAttempts: 5, randomize: false }
+		)
 
-		return { id };
+		return { id: result.id };
 	} catch (error) {
 		logger.error("Error publishing threads media container:", { error });
 		await reportErrorToDiscord({ title: 'could not publish threads media container', context: JSON.stringify({ userId, mediaContainerId }) })
