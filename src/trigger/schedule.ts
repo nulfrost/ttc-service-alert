@@ -74,7 +74,7 @@ export const scheduledThreadsPost = schedules.task({
 			};
 		} catch (error) {
 			logger.error('Error in scheduled Threads post task:', { error });
-			await reportErrorToDiscord({ title: 'failed to post to threads', description: JSON.stringify(error) })
+			await reportErrorToDiscord({ title: '[schedule.ts] failed to post to threads', context: JSON.stringify(error) })
 			// Re-throw the error to mark the task run as failed in Trigger.dev
 			throw error;
 		}

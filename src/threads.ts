@@ -47,7 +47,7 @@ export async function createThreadsMediaContainer({
 		return { id };
 	} catch (error) {
 		logger.error("Error creating threads media container:", { error });
-		await reportErrorToDiscord({ title: 'could not created threads media container', description: JSON.stringify(error) })
+		await reportErrorToDiscord({ title: 'could not created threads media container', context: JSON.stringify({ userId, postContent, shouldQuotePost, postQuoteId }) })
 		throw error;
 	}
 }
@@ -68,7 +68,7 @@ export async function publishThreadsMediaContainer({
 		return { id };
 	} catch (error) {
 		logger.error("Error publishing threads media container:", { error });
-		await reportErrorToDiscord({ title: 'could not publish threads media container', description: JSON.stringify(error) })
+		await reportErrorToDiscord({ title: 'could not publish threads media container', context: JSON.stringify({ userId, mediaContainerId }) })
 		throw error;
 	}
 }
@@ -146,7 +146,7 @@ export async function sendThreadsPost({
 		);
 	} catch (error) {
 		logger.error("Error in sendThreadsPost:", { error });
-		await reportErrorToDiscord({ title: 'failure in sendThreadsPost', description: JSON.stringify(error) })
+		await reportErrorToDiscord({ title: 'failure in sendThreadsPost', context: JSON.stringify({ lastUpdatedTimestamp, alertsToBePosted, alertsToBeCached }) })
 		throw error;
 	}
 }
